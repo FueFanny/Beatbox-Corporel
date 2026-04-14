@@ -87,51 +87,74 @@ def get_active_zone(x, y, z):
 
     return None, 0
 
+"""
+def play(x, y, z, duration=0.4):
+    note, volume = get_active_zone(x, y, z)
 
-x, y, z = 0.0, 0.0, 0.0
+    if note is not None:
+        pitch = NOTES[note]
+        sound = Piano(volume, pitch, duration)
+        channel.play(sound)
 
-active_zone = None
-last_play_time = 0
-repeat_interval = 1.0
+        print(f"Note: {note} (vol={volume:.2f})")
 
-while True:
+    else:
+        print("Pas de note")
+"""
+
+last_note = None
+last_time = 0
+intervalle = 1.0  # secondes
+
+def play2(x, y, z):
+    global last_note, last_time
 
     note, volume = get_active_zone(x, y, z)
     now = time.time()
-
-    print(f"Position: {x:.1f}, {y:.1f}, {z:.1f}")
+    print(f"x={x:.1f}, y={y:.1f}, z={z:.1f}, note={note}")
 
     if note is not None:
 
-        if note != active_zone:
-            active_zone = note
-            last_play_time = 0  # immediate trigger
-
-        if now - last_play_time > repeat_interval:
+        # nouvelle zone joue une note
+        if note != last_note:
             pitch = NOTES[note]
-            sound = Piano(volume, pitch, 0.4)
-            channel.play(sound)
+            channel.play(Piano(volume, pitch, 0.4))
 
-            print(f"Playing: {note}")
+            print(f"New note: {note}")
 
-            last_play_time = now
+            last_note = note
+            last_time = now
+
+        elif now - last_time > intervalle:
+            pitch = NOTES[note]
+            channel.play(Piano(volume, pitch, 0.4))
+
+            print(f"Repeat: {note}")
+
+            last_time = now
 
     else:
-        active_zone = None
+        last_note = None
 
+x, y, z = 0.0, 0.0, 0.0
+zones_centers = [z["center"] for z in zones]
+index = 0
 
-    # faux mouvements
+while True:
+    play2(x, y, z)
 
-    x += 3
-    y = 30 * math.sin(pygame.time.get_ticks() * 0.002)
-    z = 50 + 30 * math.sin(pygame.time.get_ticks() * 0.001)
+    # mouvement test
+    cx, cy, cz = zones_centers[index]
 
-    if x > 60:
-        x = -60
+    x += (cx - x) * 0.1
+    y += (cy - y) * 0.1
+    z += (cz - z) * 0.1
 
-    pygame.time.delay(10)
+    # quand la zone est proche, on y va
+    if abs(x - cx) < 5 and abs(y - cy) < 5 and abs(z - cz) < 5:
+        index = (index + 1) % len(zones)
 
-#---------------test
+    pygame.time.delay(20)
 
 """
 melody = [
