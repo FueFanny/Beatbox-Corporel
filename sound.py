@@ -116,11 +116,7 @@ while current_index < len(melody):
 
     print(f"Position: x={x:.1f}, y={y:.1f}, z={z:.1f}")
 
-    if (
-        note is not None
-        and note != current_note
-        and current_time - last_trigger_time > cooldown
-    ):
+    if (note is not None and note != current_note and current_time - last_trigger_time > cooldown):
 
         melody_note, duration = melody[current_index]
 
