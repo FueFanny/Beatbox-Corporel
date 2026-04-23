@@ -5,3 +5,7 @@ Dans le fichier sound.py, j'ai créé un programme conceptuel qui prend des coor
 Une zone de coordonées fait une note différente.
 
 pygame et numpy doivent être installés
+
+#python3 -m venv bnoenv
+#source bnoenv/bin/activate
+#python script2.py
