@@ -53,7 +53,6 @@ void ultrasonicTask(void *pvParameters) {
   }
 }
 
-//setup
 void setup() {
   Serial.begin(115200);
 
