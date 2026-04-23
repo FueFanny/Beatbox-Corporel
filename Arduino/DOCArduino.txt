@@ -1,0 +1,24 @@
+Partie Arduino, petite decumentation.
+
+Fait sur: 
+- un Arduino UNO,
+- connecté à mon ordinateur personnel via un cable USB type A/B
+- en utilisant Arduino IDE pour écrire le code, l'insérer dans le Arduino, ajouter ses dépendances, et voir ses résultats dans le Serial Monitor.
+    Attention : Le "baud rate" du Serial Monitor doit correspondre à celui donné dans le setup du code. Le défaut est 9600, mais le arduino UNO utilisé est capable de jusquà 115200, ce qui donne des résultats plus rapides.
+
+distance.ino :
+    Script utilisé pour vérifier le fonctionnemment du capteur ultrason, connecté au Arduino via cables. Le code utilisé est du domaine publique, il est facilement trouvable sur internet. Il renvoie la distance de l'objet le plus proche au capteur, en centimètres.
+
+    Le Schema de cablage est inclu dans le dossier Arduino, en tant que ArduinoDistance.png.
+
+arduino_sound.ino :
+    Nom dud fichier doit être changé, il ne fait pas de son car nous n'avons pas encore de speaker pour l'arduino.
+
+    Ce code vérifie le fonctionnement d'un IMU connecté à l'arduino et le capteur ultrason, en même temps, utilisant FreeRTOS.
+
+    Des dépendances sont donc requises pour ce script, si elles ne sont pas déjà installée dans l'IDE. Elles sont accessive dans l'IDE via Sketch>Include Library>Manage Libraries
+    Dans la barre de recherche, on cherche pour "FreeRTOS", "Adafruit Unified Sensor", "Adafruit BNO055" et "Adafruit BusIO", les 3 derniers correspondants au type de capteur IMU BNO-055 utilisé de la marque Adafruit.
+    Une fois le script lancé, il donnera les distances de l'ultrason et les inclinaisons/rotations/acceleration de l'IMU en même temps.
+
+    Le Schema de cablage entre l'IMU et le ARDUINO est inclu dans le dossier Arduino, en tant que ArduinoIMU.png.
+    Il y a aussi une image ArdiunoDistanceIMU.png qui montre le cablage partagé des deux.

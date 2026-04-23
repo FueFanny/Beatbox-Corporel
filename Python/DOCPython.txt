@@ -1,0 +1,33 @@
+Partie Python, petite decumentation
+
+Fait sur:
+- Visual Studio Code
+- Raspberry Pi 4B
+    - Carte SD mise en place sur l'ordinateur de l'IUT, une fois fonctionnelle et inséré dans le raspberry Pi, utilisé avec écran/clavier/souris
+    - Setup fait sur le site Raspberry pi, 
+
+Sound.py et Sound2.py: 
+    Ecrits avant le setup du raspberry pi, tests sur python avec les librairies pygame et numpy.
+    Pour prototypes de production de sons avec coordonnées x/y/z. 
+    Dans une ancienne version, Sound.py jouait un son différent dépendant des coordonnées pour ses charactéristiques
+    Sound2.py joue un son différent selon une zone définie, et joue la note correspondant à la zone associée aux coordonnées x/y/z données.
+    Les zones sont aussi définies de façons différentes, mais dans l'état actuel de sound.py, il s'agit juste d'une version inférieure à sound2.py.
+
+script/2/3.py / sonicsensor.py:
+    Les 3 scripts on étés créés sur le raspberry pi, pour tester son cablage au capteur ultrason et à l'IMU
+    script 1 correspond aux tests sur le capteur ultrason
+    script 2 correspond aux tests sur l'IMU, pour tester sa performance qui était fautive et donc avait besoin de plus de tests de dépendances et cablage.
+    script 3 correspond à une actualisation en temps réel de tests plus informatifs sur les fonctions de l'IDE, une version optimisée de script2.
+Un script maintenant supprimé et inaccessible testait le fonctionnement de l'IMU et de l'ultrason en parallèle.
+Pour l'IMU en python, des dépendances sont nécéssaires. VSCode n'étant pas installé sur le raspberry Pi, leurs installations et l'exécution des scripts ont étés fait dans le terminal.
+Pour exécuter un script en rapport avec les librairies IMU, il fallait fair la démarche suivante:
+    $ python3 -m venv bnoenv
+    $ source bnoenv/bin/activate
+    $ python script2.py
+Les dépendances nécéssaires sont: ---- tba j'ai oublié
+    sonicsensor est un programme utilisant le capteur ultrason pour faire un son dépendant de la distance détéctée par celui-ci, dans un espace 2D, avec une nouvelle zone tout les 20cm. 
+
+Dans le dossier Python, il devrait y avoir: 
+    - RaspberryDistance.png pour schématiser le cablage Raspberry Pi-Capteur ultrason,
+    - RaspberryIMU.png pour schématiser la connection Raspberry Pi-IMU Adafruit BNO055
+    - RaspberryDistanceIMU.png schématisant la connection complée des deux à une seule raspberry Pi.
