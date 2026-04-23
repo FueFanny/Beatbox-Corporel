@@ -1,64 +1,143 @@
 """
 3D Trilateration Solver
 =======================
-Given 4 anchor points O1..O4 (relative to world origin W0) and distances
-D1..D4 from unknown point P, compute P's coordinates relative to W0.
+Find the coordinates of an unknown point P in 3D space given:
+  - A world/reference origin W0
+  - N anchor points (coordinates relative to W0), where N >= 4
+  - N measured distances from P to each anchor
 
 Method
 ------
-Subtracting the first distance equation from the remaining three cancels
-the quadratic |P|^2 term and yields three linear equations in (x, y, z).
-The 3x3 system is solved with NumPy.
+Subtracting the first distance equation from the remaining N-1 equations
+cancels the quadratic |P|^2 term and yields a (N-1)x3 linear system.
 
-All anchor coordinates and the returned P are expressed relative to W0.
+  - N == 4  : exact system  (3x3) → solved with np.linalg.solve
+  - N  > 4  : overdetermined (Nx3) → solved with np.linalg.lstsq
+                               (least-squares best fit, handles noise)
+
+Requirements
+------------
+    pip install numpy
+
+Usage
+-----
+    python trilateration.py
+    or import and call trilaterate() directly in your own script.
 """
 
 import numpy as np
 
 
-def trilaterate(W0, O1, O2, O3, O4, D1, D2, D3, D4):
+# =============================================================================
+# SOLVER FUNCTION
+# =============================================================================
+
+def trilaterate(W0, anchors, distances):
     """
-    Find point P given 4 anchors and their distances to P.
+    Compute the 3D coordinates of unknown point P.
 
     Parameters
     ----------
-    W0          : array-like (3,)  world/reference origin  (X0, Y0, Z0)
-    O1..O4      : array-like (3,)  anchor coords relative to W0
-    D1..D4      : float            distances |P - Oi|
+    W0        : array-like (3,)       World/reference origin (X0, Y0, Z0)
+    anchors   : list of array-like    Anchor coordinates relative to W0,
+                                      each entry is (Xi, Yi, Zi).
+                                      Minimum 4 anchors required.
+    distances : list of float         Measured distances from P to each
+                                      anchor. Must match len(anchors).
 
     Returns
     -------
-    P_world     : ndarray (3,)     coords of P in world frame (relative to W0)
-    residuals   : ndarray (4,)     |recomputed_dist - given_dist| per anchor
+    P_world   : ndarray (3,)          Coordinates of P in the world frame
+    residuals : ndarray (N,)          |recomputed_dist - given_dist| per
+                                      anchor (close to 0 = good solution)
+
+    Raises
+    ------
+    ValueError
+        If fewer than 4 anchors are provided.
+        If anchors and distances have different lengths.
+        If the anchor configuration is degenerate (coplanar / collinear).
     """
+
+    # ------------------------------------------------------------------
+    # Input validation
+    # ------------------------------------------------------------------
+
+    if len(anchors) != len(distances):
+        raise ValueError(
+            f"Number of anchors ({len(anchors)}) must match "
+            f"number of distances ({len(distances)})."
+        )
+
+    if len(anchors) < 4:
+        raise ValueError(
+            f"At least 4 anchors are required. Got {len(anchors)}."
+        )
+
+    # Convert all inputs to numpy float arrays
     W0      = np.asarray(W0, dtype=float)
-    anchors = [np.asarray(O, dtype=float) for O in (O1, O2, O3, O4)]
-    dists   = [float(D) for D in (D1, D2, D3, D4)]
+    anchors = [np.asarray(O, dtype=float) for O in anchors]
+    dists   = [float(D) for D in distances]
 
-    O1_a, D1_a = anchors[0], dists[0]
+    O1_a = anchors[0]
+    D1_a = dists[0]
 
-    # Build 3x3 linear system by subtracting eq_1 from eq_i (i = 2, 3, 4)
-    # Row i:  2(Oi - O1) · p  =  Di² - D1² - |Oi|² + |O1|²
-    A = np.zeros((3, 3))
-    b = np.zeros(3)
+    N = len(anchors)
+
+    # ------------------------------------------------------------------
+    # Build the (N-1) x 3 linear system
+    # ------------------------------------------------------------------
+    # Each distance equation:
+    #   |P - Oi|^2 = Di^2
+    #   |P|^2 - 2*P.Oi + |Oi|^2 = Di^2
+    #
+    # Subtract equation 1 from equations 2..N to cancel |P|^2:
+    #   2*(Oi - O1).P = D1^2 - Di^2 + |Oi|^2 - |O1|^2
+    #
+    # This gives A*P = b  (N-1 equations, 3 unknowns x, y, z)
+    # ------------------------------------------------------------------
+
+    A = np.zeros((N - 1, 3))
+    b = np.zeros(N - 1)
+
     for i, (Oi, Di) in enumerate(zip(anchors[1:], dists[1:])):
         A[i] = 2.0 * (Oi - O1_a)
         b[i] = (D1_a**2 - Di**2
                 + np.dot(Oi, Oi) - np.dot(O1_a, O1_a))
 
-    # Solve for P in the W0-relative frame
-    try:
-        P_local = np.linalg.solve(A, b)
-    except np.linalg.LinAlgError:
-        raise ValueError(
-            "Anchor configuration is degenerate (singular matrix).\n"
-            "Ensure no three anchors are collinear and not all four are coplanar."
-        )
+    # ------------------------------------------------------------------
+    # Solve the linear system
+    #   N == 4  →  exact 3x3 system   (np.linalg.solve)
+    #   N  > 4  →  overdetermined     (np.linalg.lstsq, least-squares)
+    # ------------------------------------------------------------------
 
-    # P in the world frame
+    if N == 4:
+        # Exact solve
+        try:
+            P_local = np.linalg.solve(A, b)
+        except np.linalg.LinAlgError:
+            raise ValueError(
+                "Anchor configuration is degenerate (singular matrix).\n"
+                "Make sure the 4 anchors are not all coplanar or collinear."
+            )
+    else:
+        # Least-squares solve (best fit when N > 4)
+        result  = np.linalg.lstsq(A, b, rcond=None)
+        P_local = result[0]
+        rank    = result[2]
+        if rank < 3:
+            raise ValueError(
+                "Anchor configuration is degenerate (rank deficient).\n"
+                "Make sure the anchors are not all coplanar or collinear."
+            )
+
+    # Convert result from W0-relative frame to world frame
     P_world = P_local + W0
 
-    # Verification residuals (computed in the local/W0-relative frame)
+    # ------------------------------------------------------------------
+    # Verification: recompute distances and compare to given values
+    # ------------------------------------------------------------------
+
     residuals = np.array([
         abs(np.linalg.norm(P_local - Oi) - Di)
         for Oi, Di in zip(anchors, dists)
@@ -67,44 +146,62 @@ def trilaterate(W0, O1, O2, O3, O4, D1, D2, D3, D4):
     return P_world, residuals
 
 
-# ── Example ───────────────────────────────────────────────────────────────────
+# =============================================================================
+# EXAMPLE
+# =============================================================================
 
 if __name__ == "__main__":
-    # World origin
-    W0 = [1.0, 2.0, 3.0]
 
-    # Anchor coords relative to W0
-    O1 = [0.0, 0.0, 0.0]
-    O2 = [8.0, 0.0, 0.0]
-    O3 = [4.0, 6.0, 0.0]
-    O4 = [4.0, 2.0, 6.0]
+    # ------------------------------------------------------------------
+    # INPUT — set your values here
+    # Add or remove anchors and distances as needed (minimum 4)
+    # ------------------------------------------------------------------
 
-    # True P in the W0-relative frame = [3, 4, 2]
-    # → world frame = W0 + [3, 4, 2] = [4, 6, 5]
-    P_local_true = np.array([3.0, 4.0, 2.0])
-    D1 = np.linalg.norm(P_local_true - np.asarray(O1))
-    D2 = np.linalg.norm(P_local_true - np.asarray(O2))
-    D3 = np.linalg.norm(P_local_true - np.asarray(O3))
-    D4 = np.linalg.norm(P_local_true - np.asarray(O4))
+    W0 = [0.0, 0.0, 0.0]           # World/reference origin (X0, Y0, Z0)
 
-    print("=" * 55)
+    anchors = [
+        [0.0, 0.0, 0.0],            # O1 coordinate relative to W0
+        [0.0, -150.0, 65.0],            # O2 coordinate relative to W0
+        [150.0, 100.0, 0.0],            # O3 coordinate relative to W0
+        [250.0, -100.0, 0.0],            # O4 coordinate relative to W0
+        [380.0, -100.0, 100.0],            # O5 coordinate relative to W0
+        [180.0, -200.0, 200.0],            # O6 coordinate relative to W0
+    ]
+# Real D=[ 216.1, 216.16, 179.44, 119.16, 196.72,186.28]
+    distances = [
+        210,                   # D1 — measured distance from P to O1
+        216,                   # D2 — measured distance from P to O2
+        182,                   # D3 — measured distance from P to O3
+        115,                   # D4 — measured distance from P to O4
+        196,                   # D5 — measured distance from P to O5
+        184,                   # D6 — measured distance from P to O6
+    ]
+
+    # ------------------------------------------------------------------
+    # SOLVE
+    # ------------------------------------------------------------------
+
+    P, residuals = trilaterate(W0, anchors, distances)
+
+    # ------------------------------------------------------------------
+    # OUTPUT
+    # ------------------------------------------------------------------
+
+    print("=" * 50)
     print("  3D Trilateration Solver")
-    print("=" * 55)
-    print(f"  World origin  W0 = {W0}")
-    print()
-    print(f"  Anchor O1 = {O1}   D1 = {D1:.6f}")
-    print(f"  Anchor O2 = {O2}   D2 = {D2:.6f}")
-    print(f"  Anchor O3 = {O3}   D3 = {D3:.6f}")
-    print(f"  Anchor O4 = {O4}   D4 = {D4:.6f}")
-    print()
+    print("=" * 50)
 
-    P, residuals = trilaterate(W0, O1, O2, O3, O4, D1, D2, D3, D4)
+    print(f"\n  Inputs ({len(anchors)} anchors):")
+    print(f"    World origin W0 = {W0}")
+    for i, (O, D) in enumerate(zip(anchors, distances), 1):
+        print(f"    Anchor O{i} = {O},  D{i} = {D}")
 
-    P_world_expected = np.array(W0) + P_local_true
-    print(f"  Solved  P (world frame) = {np.round(P, 8)}")
-    print(f"  Expected P (world frame)= {P_world_expected}")
-    print()
-    print("  Verification — distance residuals (should be ~0):")
+    print(f"\n  Result:")
+    print(f"    P = ({P[0]:.6f},  {P[1]:.6f},  {P[2]:.6f})")
+
+    print(f"\n  Verification (residuals should be ~0):")
     for i, r in enumerate(residuals, 1):
-        status = "ok" if r < 1e-6 else "FAIL"
+        status = "ok" if r < 1e-4 else "FAIL"
         print(f"    [{status}]  |recomputed D{i} - given D{i}| = {r:.2e}")
+
+    print("=" * 50)
