@@ -6,6 +6,8 @@ Une zone de coordonées fait une note différente.
 
 pygame et numpy doivent être installés
 
-#python3 -m venv bnoenv
-#source bnoenv/bin/activate
-#python script2.py
+python3 -m venv bnoenv
+
+source bnoenv/bin/activate
+
+python script2.py
