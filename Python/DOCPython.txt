@@ -20,7 +20,7 @@ script/2/3.py / sonicsensor.py:
     script 3 correspond à une actualisation en temps réel de tests plus informatifs sur les fonctions de l'IMU, une version optimisée de script2.
 Un script maintenant supprimé et inaccessible testait le fonctionnement de l'IMU et de l'ultrason en parallèle.
 Pour l'IMU en python, des dépendances sont nécéssaires. VSCode n'étant pas installé sur le raspberry Pi, leurs installations et l'exécution des scripts ont étés fait dans le terminal.
-Pour exécuter un script en rapport avec les librairies IMU, il fallait fair la démarche suivante:
+Pour exécuter un script en rapport avec les librairies IMU, il fallait le faire dans un environement virtuel:
     $ python3 -m venv bnoenv
     $ source bnoenv/bin/activate
     $ python script2.py
