@@ -17,7 +17,7 @@ script/2/3.py / sonicsensor.py:
     Les 3 scripts on étés créés sur le raspberry pi, pour tester son cablage au capteur ultrason et à l'IMU
     script 1 correspond aux tests sur le capteur ultrason
     script 2 correspond aux tests sur l'IMU, pour tester sa performance qui était fautive et donc avait besoin de plus de tests de dépendances et cablage.
-    script 3 correspond à une actualisation en temps réel de tests plus informatifs sur les fonctions de l'IDE, une version optimisée de script2.
+    script 3 correspond à une actualisation en temps réel de tests plus informatifs sur les fonctions de l'IMU, une version optimisée de script2.
 Un script maintenant supprimé et inaccessible testait le fonctionnement de l'IMU et de l'ultrason en parallèle.
 Pour l'IMU en python, des dépendances sont nécéssaires. VSCode n'étant pas installé sur le raspberry Pi, leurs installations et l'exécution des scripts ont étés fait dans le terminal.
 Pour exécuter un script en rapport avec les librairies IMU, il fallait fair la démarche suivante:
