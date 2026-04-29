@@ -38,12 +38,6 @@ parts = [
     "left_ankle", "right_ankle"
 ]
 
-# MoveNet indices we still use:
-# 0 nose
-# 5 left_shoulder, 6 right_shoulder
-# 11 left_hip, 12 right_hip
-# 7/8 elbows, 9/10 wrists, etc.
-
 def simplify_keypoints(kp):
     """Convert MoveNet 17 points → 13 simplified points"""
 
@@ -63,11 +57,8 @@ def simplify_keypoints(kp):
     right_knee = kp[14]
     left_ankle = kp[15]
     right_ankle = kp[16]
-
-    # head = nose
     head = nose
 
-    # neck = midpoint of shoulders
     neck = [
         (ls[0] + rs[0]) / 2,
         (ls[1] + rs[1]) / 2,
