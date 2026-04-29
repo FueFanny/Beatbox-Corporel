@@ -1,22 +1,22 @@
 import cv2
 import numpy as np
-import tensorflow as tf
+import tflite_runtime.interpreter as tflite
 import time
 
-interpreter = tf.lite.Interpreter(model_path="movenet_lightning.tflite")
+interpreter = tflite.Interpreter(model_path="/home/alice/movenet_lightning.tflite")
 interpreter.allocate_tensors()
 
 input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
 
 cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 192)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 192)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 300)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 300)
 
 prev_keypoints = None
 movement_threshold = 0.03
 
-# Body part names (MoveNet order)
+# Body parts (MoveNet order)
 parts = [
     "nose",
     "left_eye", "right_eye",
@@ -31,6 +31,7 @@ parts = [
 
 def detect_pose(frame):
     img = cv2.resize(frame, (192, 192))
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     img = np.expand_dims(img, axis=0).astype(np.uint8)
 
     interpreter.set_tensor(input_details[0]['index'], img)
