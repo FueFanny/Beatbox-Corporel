@@ -62,10 +62,7 @@ if os.path.exists(CSV_FILE):
 csv_rows = []
 program_start_time = time.time()
 
-interpreter = tflite.Interpreter(
-    model_path="/home/alice/movenet_lightning.tflite",
-    num_threads=4
-)
+interpreter = tflite.Interpreter(model_path="/home/alice/movenet_lightning.tflite",num_threads=4)
 
 interpreter.allocate_tensors()
 
@@ -79,16 +76,8 @@ cap.set(cv2.CAP_PROP_FRAME_WIDTH, 480)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
 cap.set(cv2.CAP_PROP_FPS, 30)
 
-fgbg = cv2.createBackgroundSubtractorMOG2(
-    history=200,
-    varThreshold=25,
-    detectShadows=False
-)
-
-kernel = cv2.getStructuringElement(
-    cv2.MORPH_ELLIPSE,
-    (5, 5)
-)
+fgbg = cv2.createBackgroundSubtractorMOG2(history=200,varThreshold=25,detectShadows=False)
+kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5, 5))
 
 parts = [
     "head",
@@ -102,7 +91,6 @@ parts = [
 ]
 
 def simplify_keypoints(kp):
-
     nose = kp[0]
 
     ls = kp[5]
@@ -120,11 +108,10 @@ def simplify_keypoints(kp):
     right_ankle = kp[16]
     head = nose
 
-    neck = [
-        (ls[0] + rs[0]) / 2,
+    neck = [(ls[0] + rs[0]) / 2,
         (ls[1] + rs[1]) / 2,
-        min(ls[2], rs[2])
-    ]
+        min(ls[2], rs[2])]
+   
     return np.array([
         head,
         neck,
@@ -133,8 +120,7 @@ def simplify_keypoints(kp):
         left_wrist, right_wrist,
         lh, rh,
         left_knee, right_knee,
-        left_ankle, right_ankle
-    ])
+        left_ankle, right_ankle])
 
 
 latest_frame = None
