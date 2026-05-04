@@ -201,8 +201,23 @@ while True:
         text = "Moving: " + ", ".join(set(moving_parts))
         cv2.putText(display,text,(10, 30),cv2.FONT_HERSHEY_SIMPLEX,0.6,(0, 255, 255),2)
 
+
     #screenshot /IMU data
     current_time = time.time()
+    
+    current_time = time.time()
+    elapsed_time = current_time - program_start_time
+
+    # draw timestamp
+    time_text = f"{elapsed_time:.2f}s"
+    cv2.putText(display, time_text, (10, display.shape[0] - 10),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+
+    if moving_parts and (current_time - last_capture_time > CAPTURE_COOLDOWN):
+        filename = f"motion_{elapsed_time:.3f}.jpg"
+        filepath = os.path.join(SAVE_DIR, filename)
+
+        cv2.imwrite(filepath, display)
 
     if moving_parts and (current_time - last_capture_time > CAPTURE_COOLDOWN):
 
