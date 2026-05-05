@@ -54,15 +54,18 @@ for file in os.listdir(SAVE_DIR):
         os.remove(file_path)
 
 # Delete old CSV
-CSV_FILE = "motion_log.csv"
-if os.path.exists(CSV_FILE):
-    os.remove(CSV_FILE)
+CSV = "motion_log.csv"
+if os.path.exists(CSV):
+    os.remove(CSV)
 
 #csv
 csv_rows = []
 program_start_time = time.time()
 
-interpreter = tflite.Interpreter(model_path="/home/alice/movenet_lightning.tflite",num_threads=4)
+interpreter = tflite.Interpreter(
+    model_path="/home/alice/movenet_lightning.tflite",
+    num_threads=4
+)
 
 interpreter.allocate_tensors()
 
@@ -77,6 +80,7 @@ cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
 cap.set(cv2.CAP_PROP_FPS, 30)
 
 fgbg = cv2.createBackgroundSubtractorMOG2(history=200,varThreshold=25,detectShadows=False)
+
 kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5, 5))
 
 parts = [
@@ -91,6 +95,7 @@ parts = [
 ]
 
 def simplify_keypoints(kp):
+
     nose = kp[0]
 
     ls = kp[5]
@@ -108,10 +113,11 @@ def simplify_keypoints(kp):
     right_ankle = kp[16]
     head = nose
 
-    neck = [(ls[0] + rs[0]) / 2,
+    neck = [
+        (ls[0] + rs[0]) / 2,
         (ls[1] + rs[1]) / 2,
-        min(ls[2], rs[2])]
-   
+        min(ls[2], rs[2])
+    ]
     return np.array([
         head,
         neck,
@@ -120,7 +126,8 @@ def simplify_keypoints(kp):
         left_wrist, right_wrist,
         lh, rh,
         left_knee, right_knee,
-        left_ankle, right_ankle])
+        left_ankle, right_ankle
+    ])
 
 
 latest_frame = None
@@ -155,7 +162,7 @@ def pose_worker():
 threading.Thread(target=pose_worker, daemon=True).start()
 
 last_capture_time = 0
-CAPTURE_COOLDOWN = 1.0
+CAPTURE_COOLDOWN = 0.5
 
 while True:
     ret, frame = cap.read()
@@ -201,23 +208,8 @@ while True:
         text = "Moving: " + ", ".join(set(moving_parts))
         cv2.putText(display,text,(10, 30),cv2.FONT_HERSHEY_SIMPLEX,0.6,(0, 255, 255),2)
 
-
     #screenshot /IMU data
     current_time = time.time()
-    
-    current_time = time.time()
-    elapsed_time = current_time - program_start_time
-
-    # draw timestamp
-    time_text = f"{elapsed_time:.2f}s"
-    cv2.putText(display, time_text, (10, display.shape[0] - 10),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-
-    if moving_parts and (current_time - last_capture_time > CAPTURE_COOLDOWN):
-        filename = f"motion_{elapsed_time:.3f}.jpg"
-        filepath = os.path.join(SAVE_DIR, filename)
-
-        cv2.imwrite(filepath, display)
 
     if moving_parts and (current_time - last_capture_time > CAPTURE_COOLDOWN):
 
@@ -225,12 +217,61 @@ while True:
         filename = f"motion_{elapsed_time:.3f}.jpg"
         filepath = os.path.join(SAVE_DIR, filename)
 
-        cv2.imwrite(filepath, display)
+        #crop
+        moving_points = []
+        h, w = frame.shape[:2]
+
+        for i, kp in enumerate(keypoints):
+            y, x, conf = kp
+
+            if conf < CONFIDENCE_THRESHOLD:
+                continue
+            px = int(x * w)
+            py = int(y * h)
+
+            if parts[i] in moving_parts:
+                moving_points.append((px, py))
+
+        if moving_points:
+            xs = [p[0] for p in moving_points]
+            ys = [p[1] for p in moving_points]
+            x_min = min(xs)
+            x_max = max(xs)
+            y_min = min(ys)
+            y_max = max(ys)
+
+            #padding around motion
+            padding = 60
+
+            x_min = max(0, x_min - padding)
+            y_min = max(0, y_min - padding)
+            x_max = min(w, x_max + padding)
+            y_max = min(h, y_max + padding)
+            #crop minimum
+            MIN_SIZE = 180
+            box_w = x_max - x_min
+            box_h = y_max - y_min
+            if box_w < MIN_SIZE:
+                extra = (MIN_SIZE - box_w) // 2
+                x_min = max(0, x_min - extra)
+                x_max = min(w, x_max + extra)
+
+            if box_h < MIN_SIZE:
+                extra = (MIN_SIZE - box_h) // 2
+                y_min = max(0, y_min - extra)
+                y_max = min(h, y_max + extra)
+
+            cropped = display[y_min:y_max, x_min:x_max]
+
+            if cropped.size > 0:
+                cv2.imwrite(filepath, cropped)
 
         imu_data = read_imu()
-
-        row = {"time_since_start": elapsed_time,"image_file": filename,"moving_parts": ", ".join(set(moving_parts))}
-        
+        row = {
+            "time_since_start": elapsed_time,
+            "image_file": filename,
+            "moving_parts": ", ".join(set(moving_parts))
+        }
         row.update(imu_data)
         csv_rows.append(row)
         print(f"Saved: {filename}")
@@ -248,10 +289,10 @@ cv2.destroyAllWindows()
 #csv
 if len(csv_rows) > 0:
     fieldnames = list(csv_rows[0].keys())
-    with open(CSV_FILE, mode="w", newline="") as file:
+    with open(CSV, mode="w", newline="") as file:
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(csv_rows)
-    print(f"CSV saved: {CSV_FILE}")
+    print(f"CSV saved: {CSV}")
 else:
     print("No motion events recorded.")
