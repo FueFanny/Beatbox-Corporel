@@ -53,7 +53,6 @@ for file in os.listdir(SAVE_DIR):
     if os.path.isfile(file_path):
         os.remove(file_path)
 
-# Delete old CSV
 CSV = "motion_log.csv"
 if os.path.exists(CSV):
     os.remove(CSV)
