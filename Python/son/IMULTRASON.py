@@ -67,8 +67,8 @@ while True:
         current_time = time.time()
         hand_near_ground = distance < GROUND_THRESHOLD
 
-        valid_pose = (tilt == "left" andhand_near_ground)
-        cheating_pose = (tilt == "right" andhand_near_ground)
+        valid_pose = (tilt == "left" and hand_near_ground)
+        cheating_pose = (tilt == "right" and hand_near_ground)
 
         if current_time - last_note_time > NOTE_COOLDOWN:
             if valid_pose:
