@@ -19,19 +19,25 @@ sounds = {
 }
 
 TILT_THRESHOLD = 15
-GROUND_THRESHOLD = 0.35
+GROUND_THRESHOLD = 0.25
 NOTE_COOLDOWN = 0.25
 
 last_note_time = 0
 
 def get_sound(distance):
 
+    # too far from ground
+    if distance > GROUND_THRESHOLD:
+        return None
+
     # close to ground
     if distance < 0.10:
         return "hard"
+
     # medium reach
     elif distance < 0.20:
         return "medium"
+
     # slight reach
     else:
         return "soft"
@@ -47,6 +53,7 @@ while True:
         euler = imu.euler
         if euler is None:
             continue
+
         yaw, roll, pitch = euler
         tilt = "center"
 
@@ -73,15 +80,15 @@ while True:
         if current_time - last_note_time > NOTE_COOLDOWN:
             if valid_pose:
                 sound_type = get_sound(distance)
-                print(f"PLAY: {sound_type}")
-                play(sound_type)
-                last_note_time = current_time
+                if sound_type is not None:
+                    print(f"PLAY: {sound_type}")
+                    play(sound_type)
+                    last_note_time = current_time
 
             elif cheating_pose:
                 print("FALSE NOTE")
                 play("false")
                 last_note_time = current_time
-
         time.sleep(0.02)
 
     except KeyboardInterrupt:
