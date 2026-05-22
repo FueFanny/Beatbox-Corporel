@@ -19,7 +19,10 @@ def start_capture():
         return
 
     try:
-        capture_process = subprocess.Popen(["python", "capture_motion.py"])
+        capture_process = subprocess.Popen([
+            "/home/alice/PROJET_FINAL/tf-env39/bin/python",
+            "musicam.py"
+            ])
         status_label.config(
             text="Capture active",
             fg="green")
@@ -59,7 +62,7 @@ def render_video():
         root.update()
 
         subprocess.run(
-            ["python", "render_video.py"],
+            ["python", "video2.py"],
             check=True)
 
         status_label.config(
@@ -119,6 +122,13 @@ status_label = tk.Label(
 
 status_label.pack(pady=10)
 
+# CLEAN EXIT
+def on_close():
+
+    stop_capture()
+
+    root.destroy()
+
 # BUTTONS
 button_style = {
     "font": ("Arial", 12, "bold"),
@@ -171,12 +181,16 @@ open_button = tk.Button(
 
 open_button.pack(pady=10)
 
-# CLEAN EXIT
-def on_close():
+quit_button = tk.Button(
+    root,
+    text="Quitter Programme",
+    command=on_close,
+    bg="#555555",
+    fg="white",
+    **button_style
+)
 
-    stop_capture()
-
-    root.destroy()
+quit_button.pack(pady=10)
 
 root.protocol(
     "WM_DELETE_WINDOW",
