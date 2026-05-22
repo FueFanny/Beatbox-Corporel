@@ -62,7 +62,7 @@ def render_video():
         root.update()
 
         subprocess.run(
-            ["python", "video2.py"],
+            ["python", "video.py"],
             check=True)
 
         status_label.config(
