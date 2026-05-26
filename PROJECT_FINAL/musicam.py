@@ -9,6 +9,8 @@ import math
 import pygame
 import board
 import busio
+import signal
+import sys
 
 from adafruit_bno055 import BNO055_I2C
 from gpiozero import DistanceSensor
@@ -36,18 +38,20 @@ if os.path.exists(CSV_FILE):
 
 
 # IMU
+
 i2c = busio.I2C(board.SCL, board.SDA)
 imu = BNO055_I2C(i2c)
 
 # ULTRASONIC
+
 ultrasonic = DistanceSensor(
     echo=24,
     trigger=23,
     max_distance=2.0
 )
 
-
 # AUDIO
+
 pygame.mixer.init(
     frequency=44100,
     size=-16,
@@ -56,10 +60,10 @@ pygame.mixer.init(
 )
 
 sounds = {
-    "kick_soft":pygame.mixer.Sound("sounds/soft/kick.wav"),
-    "kick_medium":pygame.mixer.Sound("sounds/medium/kick.wav"),
-    "kick_hard":pygame.mixer.Sound("sounds/hard/kick.wav"),
-    "false":pygame.mixer.Sound("sounds/false/false.wav")
+    "kick_soft": pygame.mixer.Sound("sounds/soft/kick.wav"),
+    "kick_medium": pygame.mixer.Sound("sounds/medium/kick.wav"),
+    "kick_hard": pygame.mixer.Sound("sounds/hard/kick.wav"),
+    "false": pygame.mixer.Sound("sounds/false/false.wav")
 }
 
 sounds["kick_soft"].set_volume(1.0)
@@ -69,6 +73,7 @@ sounds["false"].set_volume(0.18)
 
 
 # AUDIO STATE
+
 current_channel = None
 current_sound_name = None
 current_volume = 0.0
@@ -85,6 +90,7 @@ right_tilt_start = None
 
 
 # PARAMETERS
+
 TILT_THRESHOLD = 15
 
 START_DISTANCE = 0.40
@@ -109,11 +115,14 @@ CSV_LOG_INTERVAL = 0.1
 
 
 # CSV
+
 csv_rows = []
 program_start_time = time.time()
 last_capture_time = 0
 last_csv_log_time = 0
 
+
+# TFLITE
 
 interpreter = tflite.Interpreter(
     model_path="/home/alice/movenet_lightning.tflite",
@@ -121,6 +130,7 @@ interpreter = tflite.Interpreter(
 )
 
 interpreter.allocate_tensors()
+
 input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
 
@@ -128,15 +138,16 @@ output_details = interpreter.get_output_details()
 # CAMERA
 
 cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
+
 cap.set(
     cv2.CAP_PROP_FOURCC,
     cv2.VideoWriter_fourcc(*'MJPG')
 )
 
-# lower resolution for performance
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
 cap.set(cv2.CAP_PROP_FPS, 30)
+
 
 # BACKGROUND SUBTRACTION
 
@@ -146,7 +157,11 @@ fgbg = cv2.createBackgroundSubtractorMOG2(
     detectShadows=False
 )
 
-kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5, 5))
+kernel = cv2.getStructuringElement(
+    cv2.MORPH_ELLIPSE,
+    (5, 5)
+)
+
 
 # BODY PARTS
 
@@ -173,6 +188,31 @@ parts = [
     "right_ankle"
 ]
 
+connections = [
+    (0, 1),
+
+    (1, 2),
+    (1, 3),
+
+    (2, 4),
+    (4, 6),
+
+    (3, 5),
+    (5, 7),
+
+    (2, 8),
+    (3, 9),
+
+    (8, 9),
+
+    (8, 10),
+    (10, 12),
+
+    (9, 11),
+    (11, 13)
+]
+
+
 # IMU READ
 
 def read_imu():
@@ -183,22 +223,27 @@ def read_imu():
     gravity = imu.gravity
 
     return {
-        "accel_x":accel[0] if accel else None,
-        "accel_y":accel[1] if accel else None,
-        "accel_z":accel[2] if accel else None,
-        "gyro_x":gyro[0] if gyro else None,
-        "gyro_y":gyro[1] if gyro else None,
-        "gyro_z":gyro[2] if gyro else None,
-        "yaw":euler[0] if euler else None,
-        "roll":euler[1] if euler else None,
-        "pitch":euler[2] if euler else None,
-        "linear_x":linear[0] if linear else None,
-        "linear_y":linear[1] if linear else None,
-        "linear_z":linear[2] if linear else None,
-        "gravity_x":gravity[0] if gravity else None,
-        "gravity_y":gravity[1] if gravity else None,
-        "gravity_z":gravity[2] if gravity else None
+        "accel_x": accel[0] if accel else None,
+        "accel_y": accel[1] if accel else None,
+        "accel_z": accel[2] if accel else None,
+
+        "gyro_x": gyro[0] if gyro else None,
+        "gyro_y": gyro[1] if gyro else None,
+        "gyro_z": gyro[2] if gyro else None,
+
+        "yaw": euler[0] if euler else None,
+        "roll": euler[1] if euler else None,
+        "pitch": euler[2] if euler else None,
+
+        "linear_x": linear[0] if linear else None,
+        "linear_y": linear[1] if linear else None,
+        "linear_z": linear[2] if linear else None,
+
+        "gravity_x": gravity[0] if gravity else None,
+        "gravity_y": gravity[1] if gravity else None,
+        "gravity_z": gravity[2] if gravity else None
     }
+
 
 # AUDIO HELPERS
 
@@ -207,17 +252,21 @@ def clamp(val, low, high):
 
 
 def distance_to_volume(distance):
+
     normalized = 1.0 - (
         (distance - MIN_DISTANCE) /
         (START_DISTANCE - MIN_DISTANCE)
     )
 
     normalized = clamp(normalized, 0.0, 1.0)
+
     boosted = normalized ** 0.35
+
     return clamp(boosted, 0.35, 1.0)
 
 
 def get_kick_from_acceleration(accel_mag):
+
     if accel_mag >= HARD_ACCEL:
         return "kick_hard"
 
@@ -229,6 +278,7 @@ def get_kick_from_acceleration(accel_mag):
 
 
 def stop_sound():
+
     global current_channel
     global current_sound_name
     global current_volume
@@ -242,6 +292,7 @@ def stop_sound():
 
 
 def play_loop(sound_name, volume):
+
     global current_channel
     global current_sound_name
     global current_volume
@@ -258,27 +309,37 @@ def play_loop(sound_name, volume):
     )
 
     if current_channel is None:
-        current_channel = sounds[sound_name].play(loops=-1)
+
+        current_channel = sounds[sound_name].play(
+            loops=-1
+        )
 
         current_sound_name = sound_name
         last_kick_change = current_time
 
     elif should_change:
+
         stop_sound()
 
-        current_channel = sounds[sound_name].play(loops=-1)
+        current_channel = sounds[sound_name].play(
+            loops=-1
+        )
+
         current_sound_name = sound_name
         last_kick_change = current_time
 
     boosted_volume = min(volume * 2.2, 1.0)
+
     if current_channel:
         current_channel.set_volume(boosted_volume)
+
     current_volume = boosted_volume
 
 
 # POSE SIMPLIFICATION
 
 def simplify_keypoints(kp):
+
     nose = kp[0]
 
     ls = kp[5]
@@ -307,54 +368,142 @@ def simplify_keypoints(kp):
         min(ls[2], rs[2])
     ]
 
-    return np.array([head,neck,ls,rs,left_elbow,right_elbow,left_wrist,right_wrist,lh,rh,left_knee,right_knee,left_ankle,right_ankle])
+    return np.array([
+        head,
+        neck,
 
-# THREAD SHARED DATA
+        ls,
+        rs,
+
+        left_elbow,
+        right_elbow,
+
+        left_wrist,
+        right_wrist,
+
+        lh,
+        rh,
+
+        left_knee,
+        right_knee,
+
+        left_ankle,
+        right_ankle
+    ])
+
+
+# THREAD DATA
 
 latest_frame = None
 latest_keypoints = None
+
 lock = threading.Lock()
+
+running = True
+
+
+# CLEAN EXIT
+
+def clean_exit(signum=None, frame=None):
+
+    global running
+
+    running = False
+
+    print("\nStopping...")
+
+    cap.release()
+
+    cv2.destroyAllWindows()
+
+    stop_sound()
+
+    pygame.quit()
+
+    if len(csv_rows) > 0:
+
+        fieldnames = list(csv_rows[0].keys())
+
+        with open(
+            CSV_FILE,
+            mode="w",
+            newline=""
+        ) as file:
+
+            writer = csv.DictWriter(
+                file,
+                fieldnames=fieldnames
+            )
+
+            writer.writeheader()
+            writer.writerows(csv_rows)
+
+        print(f"\nCSV saved: {CSV_FILE}")
+
+    sys.exit(0)
+
+
+signal.signal(signal.SIGTERM, clean_exit)
+signal.signal(signal.SIGINT, clean_exit)
+
 
 # POSE THREAD
 
 def pose_worker():
+
     global latest_frame
     global latest_keypoints
 
-    while True:
+    while running:
+
         if latest_frame is None:
             time.sleep(0.005)
             continue
+
         with lock:
             frame = latest_frame.copy()
 
         img = cv2.resize(frame, (192, 192))
-        img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img = np.expand_dims(img, axis=0).astype(np.uint8)
 
         interpreter.set_tensor(
             input_details[0]['index'],
             img
         )
+
         interpreter.invoke()
-        kp = interpreter.get_tensor(output_details[0]['index'])[0][0]
+
+        kp = interpreter.get_tensor(
+            output_details[0]['index']
+        )[0][0]
+
         kp = simplify_keypoints(kp)
 
         with lock:
             latest_keypoints = kp
 
-threading.Thread(target=pose_worker,daemon=True).start()
+
+threading.Thread(
+    target=pose_worker,
+    daemon=True
+).start()
+
 
 # MAIN LOOP
 
 print("Programme lancé.")
 
-while True:
+while running:
+
     try:
         ret, frame = cap.read()
+
         if not ret:
             continue
+
         frame = cv2.flip(frame, 1)
+
         display = frame.copy()
 
         with lock:
@@ -364,18 +513,70 @@ while True:
         # MOTION MASK
 
         fgmask = fgbg.apply(frame)
-        fgmask = cv2.morphologyEx(fgmask,cv2.MORPH_OPEN,kernel)
-        fgmask = cv2.morphologyEx(fgmask,cv2.MORPH_DILATE,kernel,iterations=2)
-        _, fgmask = cv2.threshold(fgmask,200,255,cv2.THRESH_BINARY)
+
+        fgmask = cv2.morphologyEx(
+            fgmask,
+            cv2.MORPH_OPEN,
+            kernel
+        )
+
+        fgmask = cv2.morphologyEx(
+            fgmask,
+            cv2.MORPH_DILATE,
+            kernel,
+            iterations=2
+        )
+
+        _, fgmask = cv2.threshold(
+            fgmask,
+            200,
+            255,
+            cv2.THRESH_BINARY
+        )
 
         moving_parts = []
 
         # KEYPOINTS
 
         if keypoints is not None:
+
             h, w = frame.shape[:2]
+
+            # DRAW SKELETON
+
+            for p1, p2 in connections:
+
+                kp1 = keypoints[p1]
+                kp2 = keypoints[p2]
+
+                y1, x1, c1 = kp1
+                y2, x2, c2 = kp2
+
+                if (
+                    c1 > CONFIDENCE_THRESHOLD and
+                    c2 > CONFIDENCE_THRESHOLD
+                ):
+
+                    px1 = int(x1 * w)
+                    py1 = int(y1 * h)
+
+                    px2 = int(x2 * w)
+                    py2 = int(y2 * h)
+
+                    cv2.line(
+                        display,
+                        (px1, py1),
+                        (px2, py2),
+                        (0, 255, 0),
+                        2
+                    )
+
+            # DRAW JOINTS
+
             for i, kp in enumerate(keypoints):
+
                 y, x, conf = kp
+
                 if conf < CONFIDENCE_THRESHOLD:
                     continue
 
@@ -385,19 +586,24 @@ while True:
                 cv2.circle(
                     display,
                     (px, py),
-                    4,
+                    5,
                     (255, 255, 255),
                     -1
                 )
 
-                if 0 <= px < w and 0 <= py < h:
+                if (
+                    0 <= px < w and
+                    0 <= py < h
+                ):
+
                     if fgmask[py, px] > 0:
+
                         moving_parts.append(parts[i])
 
                         cv2.circle(
                             display,
                             (px, py),
-                            7,
+                            8,
                             (0, 0, 255),
                             -1
                         )
@@ -416,7 +622,10 @@ while True:
 
         if moving_parts:
 
-            text = ("Moving: " + ", ".join(set(moving_parts)))
+            text = (
+                "Moving: " +
+                ", ".join(set(moving_parts))
+            )
 
             cv2.putText(
                 display,
@@ -433,6 +642,7 @@ while True:
         # IMU
 
         imu_data = read_imu()
+
         roll = imu_data["roll"]
 
         accel_x = imu_data["linear_x"] or 0
@@ -446,52 +656,100 @@ while True:
         )
 
         raw_distance = ultrasonic.distance
-        filtered_distance = (SMOOTHING * filtered_distance + (1 - SMOOTHING) * raw_distance)
+
+        filtered_distance = (
+            SMOOTHING * filtered_distance +
+            (1 - SMOOTHING) * raw_distance
+        )
+
         distance_cm = filtered_distance * 100
 
         if accel_mag > peak_accel:
+
             peak_accel = accel_mag
             peak_accel_time = current_time
 
-        if current_time - peak_accel_time > MOTION_MEMORY_TIME:
+        if (
+            current_time - peak_accel_time >
+            MOTION_MEMORY_TIME
+        ):
+
             peak_accel *= 0.92
 
-        effective_accel = max(accel_mag,peak_accel)
+        effective_accel = max(
+            accel_mag,
+            peak_accel
+        )
 
         tilt = "center"
 
         if roll is not None:
+
             if roll > TILT_THRESHOLD:
                 tilt = "right"
+
             elif roll < -TILT_THRESHOLD:
                 tilt = "left"
 
-        hand_in_range = (MIN_DISTANCE <= filtered_distance <= START_DISTANCE)
+        hand_in_range = (
+            MIN_DISTANCE <= filtered_distance <= START_DISTANCE
+        )
 
-        valid_pose = (tilt == "left" and hand_in_range)
-        cheating_pose = (tilt == "right" and hand_in_range)
+        valid_pose = (
+            tilt == "left" and hand_in_range
+        )
 
-        if (valid_pose and current_time - last_play_time > MIN_PLAY_TIME):
-            volume = distance_to_volume(filtered_distance)
-            kick_type = get_kick_from_acceleration(effective_accel)
+        cheating_pose = (
+            tilt == "right" and hand_in_range
+        )
 
-            play_loop(kick_type,volume)
+        # AUDIO
+
+        if (
+            valid_pose and
+            current_time - last_play_time > MIN_PLAY_TIME
+        ):
+
+            volume = distance_to_volume(
+                filtered_distance
+            )
+
+            kick_type = get_kick_from_acceleration(
+                effective_accel
+            )
+
+            play_loop(
+                kick_type,
+                volume
+            )
+
             last_play_time = current_time
 
         else:
             stop_sound()
 
+        # FALSE SOUND
+
         if cheating_pose:
+
             if right_tilt_start is None:
                 right_tilt_start = current_time
 
-            held_time = (current_time - right_tilt_start)
+            held_time = (
+                current_time -
+                right_tilt_start
+            )
 
             if held_time > FALSE_TRIGGER_TIME:
+
                 sounds["false"].play()
+
                 right_tilt_start = None
+
         else:
             right_tilt_start = None
+
+        # UI TEXT
 
         cv2.putText(
             display,
@@ -523,29 +781,49 @@ while True:
             2
         )
 
+        # SCREENSHOT
+
         filename = None
 
-        if (moving_parts and current_time - last_capture_time > CAPTURE_COOLDOWN):
-            elapsed_time = round(current_time - program_start_time,3)
+        if (
+            keypoints is not None and
+            moving_parts and
+            current_time - last_capture_time > CAPTURE_COOLDOWN
+        ):
 
-            filename = f"motion_{elapsed_time:.3f}.jpg"
-            filepath = os.path.join(SAVE_DIR,filename)
+            elapsed_time = round(
+                current_time - program_start_time,
+                3
+            )
+
+            filename = (
+                f"motion_{elapsed_time:.3f}.jpg"
+            )
+
+            filepath = os.path.join(
+                SAVE_DIR,
+                filename
+            )
+
             moving_points = []
 
             h, w = frame.shape[:2]
 
             for i, kp in enumerate(keypoints):
+
                 y, x, conf = kp
 
                 if conf < CONFIDENCE_THRESHOLD:
                     continue
+
                 px = int(x * w)
                 py = int(y * h)
 
                 if parts[i] in moving_parts:
                     moving_points.append((px, py))
 
-            if moving_points:
+            if len(moving_points) > 0:
+
                 xs = [p[0] for p in moving_points]
                 ys = [p[1] for p in moving_points]
 
@@ -563,94 +841,79 @@ while True:
                 x_max = min(w, x_max + padding)
                 y_max = min(h, y_max + padding)
 
-                MIN_SIZE = 180
-
-                box_w = x_max - x_min
-                box_h = y_max - y_min
-
-                if box_w < MIN_SIZE:
-                    extra = (MIN_SIZE - box_w) // 2
-                    x_min = max(0, x_min - extra)
-                    x_max = min(w, x_max + extra)
-
-                if box_h < MIN_SIZE:
-                    extra = (MIN_SIZE - box_h) // 2
-                    y_min = max(0, y_min - extra)
-                    y_max = min(h, y_max + extra)
-
                 cropped = display[
                     y_min:y_max,
                     x_min:x_max
-                    ]
+                ]
 
                 if cropped.size > 0:
-                    cv2.imwrite(filepath,cropped)
+
+                    cv2.imwrite(
+                        filepath,
+                        cropped
+                    )
+
                     print(f"Saved: {filename}")
 
-            last_capture_time = current_time
+                    last_capture_time = current_time
 
-        if (current_time - last_csv_log_time > CSV_LOG_INTERVAL):
+        # CSV
+
+        if (
+            current_time - last_csv_log_time >
+            CSV_LOG_INTERVAL
+        ):
 
             row = {
-                "time_since_start":
-                    round(
-                        current_time -
-                        program_start_time,
-                        3
-                    ),
-                "image_file":
-                    filename,
+                "time_since_start": round(
+                    current_time -
+                    program_start_time,
+                    3
+                ),
+
+                "image_file": filename,
+
                 "moving_parts":
                     ", ".join(set(moving_parts)),
+
                 "sound_played":
                     current_sound_name,
+
                 "sound_volume":
                     round(current_volume, 3),
+
                 "distance_cm":
                     round(distance_cm, 2)
             }
+
             row.update(imu_data)
+
             csv_rows.append(row)
+
             last_csv_log_time = current_time
+
+        # WINDOWS
 
         cv2.imshow(
             "Interactive Motion + Sound",
             display
         )
+
         cv2.imshow(
             "Motion Mask",
             fgmask
         )
 
-        # ESC TO EXIT
+        # ESC
+
         if cv2.waitKey(1) & 0xFF == 27:
-            break
+            clean_exit()
 
     except KeyboardInterrupt:
-        break
+        clean_exit()
 
     except Exception as e:
         print("Error:", e)
         time.sleep(0.05)
 
-cap.release()
-cv2.destroyAllWindows()
-stop_sound()
-pygame.quit()
-
-if len(csv_rows) > 0:
-    fieldnames = list(csv_rows[0].keys())
-    with open(
-        CSV_FILE,
-        mode="w",
-        newline=""
-    ) as file:
-        writer = csv.DictWriter(
-            file,
-            fieldnames=fieldnames
-        )
-        writer.writeheader()
-        writer.writerows(csv_rows)
-    print(f"\nCSV saved: {CSV_FILE}")
-else:
-    print("\nNo data recorded.")
+clean_exit()
