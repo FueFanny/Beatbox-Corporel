@@ -809,10 +809,7 @@ while running:
         # AUDIO
         # =====================================================
 
-        if (
-            correct_trigger and
-            current_time - last_play_time > MIN_PLAY_TIME
-        ):
+        if correct_trigger:
 
             volume = distance_to_volume(
                 active_distance
@@ -829,10 +826,10 @@ while running:
 
             last_play_time = current_time
 
-            wrong_pose_start = None
-
         else:
+
             stop_sound()
+
 
         # =====================================================
         # FALSE SOUND
@@ -850,11 +847,14 @@ while running:
 
             if held_time > FALSE_TRIGGER_TIME:
 
-                sounds["false"].play()
+                if not pygame.mixer.get_busy():
+
+                    sounds["false"].play()
 
                 wrong_pose_start = None
 
         else:
+
             wrong_pose_start = None
 
         # =====================================================
