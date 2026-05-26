@@ -29,6 +29,7 @@ os.makedirs(SAVE_DIR, exist_ok=True)
 
 # clear old captures
 for file in os.listdir(SAVE_DIR):
+
     file_path = os.path.join(SAVE_DIR, file)
 
     if os.path.isfile(file_path):
@@ -99,13 +100,13 @@ current_volume = 0.0
 last_kick_change = 0
 last_play_time = 0
 
+wrong_pose_start = None
+
 filtered_left_distance = 0.40
 filtered_right_distance = 0.40
 
 peak_accel = 0
 peak_accel_time = 0
-
-wrong_pose_start = None
 
 
 # =========================================================
@@ -176,22 +177,6 @@ cap.set(
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
 cap.set(cv2.CAP_PROP_FPS, 30)
-
-
-# =========================================================
-# BACKGROUND SUBTRACTION
-# =========================================================
-
-fgbg = cv2.createBackgroundSubtractorMOG2(
-    history=200,
-    varThreshold=25,
-    detectShadows=False
-)
-
-kernel = cv2.getStructuringElement(
-    cv2.MORPH_ELLIPSE,
-    (5, 5)
-)
 
 
 # =========================================================
@@ -545,6 +530,7 @@ print("Programme lancé.")
 while running:
 
     try:
+
         ret, frame = cap.read()
 
         if not ret:
@@ -558,33 +544,9 @@ while running:
             latest_frame = frame.copy()
             keypoints = latest_keypoints
 
-        # =====================================================
-        # MOTION MASK
-        # =====================================================
-
-        fgmask = fgbg.apply(frame)
-
-        fgmask = cv2.morphologyEx(
-            fgmask,
-            cv2.MORPH_OPEN,
-            kernel
-        )
-
-        fgmask = cv2.morphologyEx(
-            fgmask,
-            cv2.MORPH_DILATE,
-            kernel,
-            iterations=2
-        )
-
-        _, fgmask = cv2.threshold(
-            fgmask,
-            200,
-            255,
-            cv2.THRESH_BINARY
-        )
-
         moving_parts = []
+
+        current_time = time.time()
 
         # =====================================================
         # KEYPOINTS
@@ -632,66 +594,28 @@ while running:
                 if conf < CONFIDENCE_THRESHOLD:
                     continue
 
+                moving_parts.append(parts[i])
+
                 px = int(x * w)
                 py = int(y * h)
 
                 cv2.circle(
                     display,
                     (px, py),
-                    5,
+                    6,
                     (255, 255, 255),
                     -1
                 )
 
-                if (
-                    0 <= px < w and
-                    0 <= py < h
-                ):
-
-                    if fgmask[py, px] > 0:
-
-                        moving_parts.append(parts[i])
-
-                        cv2.circle(
-                            display,
-                            (px, py),
-                            8,
-                            (0, 0, 255),
-                            -1
-                        )
-
-                        cv2.putText(
-                            display,
-                            parts[i],
-                            (px + 5, py),
-                            cv2.FONT_HERSHEY_SIMPLEX,
-                            0.4,
-                            (0, 0, 255),
-                            1
-                        )
-
-        # =====================================================
-        # MOTION TEXT
-        # =====================================================
-
-        if moving_parts:
-
-            text = (
-                "Moving: " +
-                ", ".join(set(moving_parts))
-            )
-
-            cv2.putText(
-                display,
-                text,
-                (10, 30),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.5,
-                (0, 255, 255),
-                2
-            )
-
-        current_time = time.time()
+                cv2.putText(
+                    display,
+                    parts[i],
+                    (px + 5, py),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.4,
+                    (0, 255, 0),
+                    1
+                )
 
         # =====================================================
         # IMU
@@ -783,7 +707,7 @@ while running:
 
         active_distance = None
 
-        # LEFT TILT = LEFT SENSOR
+        # LEFT SIDE
 
         if tilt == "left":
 
@@ -794,7 +718,7 @@ while running:
             elif right_in_range:
                 wrong_trigger = True
 
-        # RIGHT TILT = RIGHT SENSOR
+        # RIGHT SIDE
 
         elif tilt == "right":
 
@@ -809,7 +733,10 @@ while running:
         # AUDIO
         # =====================================================
 
-        if correct_trigger:
+        if (
+            correct_trigger and
+            current_time - last_play_time > MIN_PLAY_TIME
+        ):
 
             volume = distance_to_volume(
                 active_distance
@@ -830,7 +757,6 @@ while running:
 
             stop_sound()
 
-
         # =====================================================
         # FALSE SOUND
         # =====================================================
@@ -847,9 +773,7 @@ while running:
 
             if held_time > FALSE_TRIGGER_TIME:
 
-                if not pygame.mixer.get_busy():
-
-                    sounds["false"].play()
+                sounds["false"].play()
 
                 wrong_pose_start = None
 
@@ -858,33 +782,23 @@ while running:
             wrong_pose_start = None
 
         # =====================================================
-        # UI TEXT
+        # UI
         # =====================================================
 
         cv2.putText(
             display,
-            f"Sound: {current_sound_name}",
-            (10, 60),
+            f"Tilt: {tilt}",
+            (10, 30),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.5,
-            (0, 255, 0),
-            2
-        )
-
-        cv2.putText(
-            display,
-            f"Volume: {current_volume:.2f}",
-            (10, 85),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.5,
-            (255, 255, 0),
+            0.6,
+            (255, 255, 255),
             2
         )
 
         cv2.putText(
             display,
             f"Left: {left_distance_cm:.1f} cm",
-            (10, 110),
+            (10, 60),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.5,
             (255, 0, 255),
@@ -894,7 +808,7 @@ while running:
         cv2.putText(
             display,
             f"Right: {right_distance_cm:.1f} cm",
-            (10, 135),
+            (10, 90),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.5,
             (0, 200, 255),
@@ -903,11 +817,21 @@ while running:
 
         cv2.putText(
             display,
-            f"Tilt: {tilt}",
-            (10, 160),
+            f"Sound: {current_sound_name}",
+            (10, 120),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.5,
-            (255, 255, 255),
+            (0, 255, 0),
+            2
+        )
+
+        cv2.putText(
+            display,
+            f"Volume: {current_volume:.2f}",
+            (10, 150),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (255, 255, 0),
             2
         )
 
@@ -919,7 +843,6 @@ while running:
 
         if (
             keypoints is not None and
-            moving_parts and
             current_time - last_capture_time > CAPTURE_COOLDOWN
         ):
 
@@ -937,57 +860,14 @@ while running:
                 filename
             )
 
-            moving_points = []
+            cv2.imwrite(
+                filepath,
+                display
+            )
 
-            h, w = frame.shape[:2]
+            print(f"Saved: {filename}")
 
-            for i, kp in enumerate(keypoints):
-
-                y, x, conf = kp
-
-                if conf < CONFIDENCE_THRESHOLD:
-                    continue
-
-                px = int(x * w)
-                py = int(y * h)
-
-                if parts[i] in moving_parts:
-                    moving_points.append((px, py))
-
-            if len(moving_points) > 0:
-
-                xs = [p[0] for p in moving_points]
-                ys = [p[1] for p in moving_points]
-
-                x_min = min(xs)
-                x_max = max(xs)
-
-                y_min = min(ys)
-                y_max = max(ys)
-
-                padding = 60
-
-                x_min = max(0, x_min - padding)
-                y_min = max(0, y_min - padding)
-
-                x_max = min(w, x_max + padding)
-                y_max = min(h, y_max + padding)
-
-                cropped = display[
-                    y_min:y_max,
-                    x_min:x_max
-                ]
-
-                if cropped.size > 0:
-
-                    cv2.imwrite(
-                        filepath,
-                        cropped
-                    )
-
-                    print(f"Saved: {filename}")
-
-                    last_capture_time = current_time
+            last_capture_time = current_time
 
         # =====================================================
         # CSV
@@ -1007,9 +887,6 @@ while running:
 
                 "image_file": filename,
 
-                "moving_parts":
-                    ", ".join(set(moving_parts)),
-
                 "sound_played":
                     current_sound_name,
 
@@ -1023,7 +900,13 @@ while running:
                     round(right_distance_cm, 2),
 
                 "tilt":
-                    tilt
+                    tilt,
+
+                "correct_trigger":
+                    correct_trigger,
+
+                "wrong_trigger":
+                    wrong_trigger
             }
 
             row.update(imu_data)
@@ -1033,17 +916,12 @@ while running:
             last_csv_log_time = current_time
 
         # =====================================================
-        # WINDOWS
+        # WINDOW
         # =====================================================
 
         cv2.imshow(
             "Interactive Motion + Sound",
             display
-        )
-
-        cv2.imshow(
-            "Motion Mask",
-            fgmask
         )
 
         # =====================================================
@@ -1057,7 +935,9 @@ while running:
         clean_exit()
 
     except Exception as e:
+
         print("Error:", e)
+
         time.sleep(0.05)
 
 clean_exit()
