@@ -16,7 +16,9 @@ from adafruit_bno055 import BNO055_I2C
 from gpiozero import DistanceSensor
 
 
+# =========================================================
 # INITIALIZATION
+# =========================================================
 
 CONFIDENCE_THRESHOLD = 0.3
 
@@ -37,20 +39,34 @@ if os.path.exists(CSV_FILE):
     os.remove(CSV_FILE)
 
 
+# =========================================================
 # IMU
+# =========================================================
 
 i2c = busio.I2C(board.SCL, board.SDA)
 imu = BNO055_I2C(i2c)
 
-# ULTRASONIC
 
-ultrasonic = DistanceSensor(
+# =========================================================
+# ULTRASONIC SENSORS
+# =========================================================
+
+left_sensor = DistanceSensor(
     echo=24,
     trigger=23,
     max_distance=2.0
 )
 
+right_sensor = DistanceSensor(
+    echo=17,
+    trigger=27,
+    max_distance=2.0
+)
+
+
+# =========================================================
 # AUDIO
+# =========================================================
 
 pygame.mixer.init(
     frequency=44100,
@@ -72,7 +88,9 @@ sounds["kick_hard"].set_volume(1.0)
 sounds["false"].set_volume(0.18)
 
 
+# =========================================================
 # AUDIO STATE
+# =========================================================
 
 current_channel = None
 current_sound_name = None
@@ -81,15 +99,18 @@ current_volume = 0.0
 last_kick_change = 0
 last_play_time = 0
 
-filtered_distance = 0.40
+filtered_left_distance = 0.40
+filtered_right_distance = 0.40
 
 peak_accel = 0
 peak_accel_time = 0
 
-right_tilt_start = None
+wrong_pose_start = None
 
 
+# =========================================================
 # PARAMETERS
+# =========================================================
 
 TILT_THRESHOLD = 15
 
@@ -114,15 +135,21 @@ CAPTURE_COOLDOWN = 0.5
 CSV_LOG_INTERVAL = 0.1
 
 
+# =========================================================
 # CSV
+# =========================================================
 
 csv_rows = []
+
 program_start_time = time.time()
+
 last_capture_time = 0
 last_csv_log_time = 0
 
 
+# =========================================================
 # TFLITE
+# =========================================================
 
 interpreter = tflite.Interpreter(
     model_path="/home/alice/movenet_lightning.tflite",
@@ -135,7 +162,9 @@ input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
 
 
+# =========================================================
 # CAMERA
+# =========================================================
 
 cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
 
@@ -149,7 +178,9 @@ cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
 cap.set(cv2.CAP_PROP_FPS, 30)
 
 
+# =========================================================
 # BACKGROUND SUBTRACTION
+# =========================================================
 
 fgbg = cv2.createBackgroundSubtractorMOG2(
     history=200,
@@ -163,7 +194,9 @@ kernel = cv2.getStructuringElement(
 )
 
 
+# =========================================================
 # BODY PARTS
+# =========================================================
 
 parts = [
     "head",
@@ -213,9 +246,12 @@ connections = [
 ]
 
 
+# =========================================================
 # IMU READ
+# =========================================================
 
 def read_imu():
+
     accel = imu.acceleration
     gyro = imu.gyro
     euler = imu.euler
@@ -245,7 +281,9 @@ def read_imu():
     }
 
 
+# =========================================================
 # AUDIO HELPERS
+# =========================================================
 
 def clamp(val, low, high):
     return max(low, min(high, val))
@@ -336,7 +374,9 @@ def play_loop(sound_name, volume):
     current_volume = boosted_volume
 
 
+# =========================================================
 # POSE SIMPLIFICATION
+# =========================================================
 
 def simplify_keypoints(kp):
 
@@ -392,7 +432,9 @@ def simplify_keypoints(kp):
     ])
 
 
+# =========================================================
 # THREAD DATA
+# =========================================================
 
 latest_frame = None
 latest_keypoints = None
@@ -402,7 +444,9 @@ lock = threading.Lock()
 running = True
 
 
+# =========================================================
 # CLEAN EXIT
+# =========================================================
 
 def clean_exit(signum=None, frame=None):
 
@@ -447,7 +491,9 @@ signal.signal(signal.SIGTERM, clean_exit)
 signal.signal(signal.SIGINT, clean_exit)
 
 
+# =========================================================
 # POSE THREAD
+# =========================================================
 
 def pose_worker():
 
@@ -490,7 +536,9 @@ threading.Thread(
 ).start()
 
 
+# =========================================================
 # MAIN LOOP
+# =========================================================
 
 print("Programme lancé.")
 
@@ -510,7 +558,9 @@ while running:
             latest_frame = frame.copy()
             keypoints = latest_keypoints
 
+        # =====================================================
         # MOTION MASK
+        # =====================================================
 
         fgmask = fgbg.apply(frame)
 
@@ -536,13 +586,15 @@ while running:
 
         moving_parts = []
 
+        # =====================================================
         # KEYPOINTS
+        # =====================================================
 
         if keypoints is not None:
 
             h, w = frame.shape[:2]
 
-            # DRAW SKELETON
+            # skeleton
 
             for p1, p2 in connections:
 
@@ -571,7 +623,7 @@ while running:
                         2
                     )
 
-            # DRAW JOINTS
+            # joints
 
             for i, kp in enumerate(keypoints):
 
@@ -618,7 +670,9 @@ while running:
                             1
                         )
 
+        # =====================================================
         # MOTION TEXT
+        # =====================================================
 
         if moving_parts:
 
@@ -639,7 +693,9 @@ while running:
 
         current_time = time.time()
 
+        # =====================================================
         # IMU
+        # =====================================================
 
         imu_data = read_imu()
 
@@ -655,14 +711,29 @@ while running:
             accel_z**2
         )
 
-        raw_distance = ultrasonic.distance
+        # =====================================================
+        # ULTRASONIC
+        # =====================================================
 
-        filtered_distance = (
-            SMOOTHING * filtered_distance +
-            (1 - SMOOTHING) * raw_distance
+        raw_left_distance = left_sensor.distance
+        raw_right_distance = right_sensor.distance
+
+        filtered_left_distance = (
+            SMOOTHING * filtered_left_distance +
+            (1 - SMOOTHING) * raw_left_distance
         )
 
-        distance_cm = filtered_distance * 100
+        filtered_right_distance = (
+            SMOOTHING * filtered_right_distance +
+            (1 - SMOOTHING) * raw_right_distance
+        )
+
+        left_distance_cm = filtered_left_distance * 100
+        right_distance_cm = filtered_right_distance * 100
+
+        # =====================================================
+        # ACCEL MEMORY
+        # =====================================================
 
         if accel_mag > peak_accel:
 
@@ -681,6 +752,10 @@ while running:
             peak_accel
         )
 
+        # =====================================================
+        # TILT
+        # =====================================================
+
         tilt = "center"
 
         if roll is not None:
@@ -691,27 +766,56 @@ while running:
             elif roll < -TILT_THRESHOLD:
                 tilt = "left"
 
-        hand_in_range = (
-            MIN_DISTANCE <= filtered_distance <= START_DISTANCE
+        # =====================================================
+        # SENSOR STATES
+        # =====================================================
+
+        left_in_range = (
+            MIN_DISTANCE <= filtered_left_distance <= START_DISTANCE
         )
 
-        valid_pose = (
-            tilt == "left" and hand_in_range
+        right_in_range = (
+            MIN_DISTANCE <= filtered_right_distance <= START_DISTANCE
         )
 
-        cheating_pose = (
-            tilt == "right" and hand_in_range
-        )
+        correct_trigger = False
+        wrong_trigger = False
 
+        active_distance = None
+
+        # LEFT TILT = LEFT SENSOR
+
+        if tilt == "left":
+
+            if left_in_range:
+                correct_trigger = True
+                active_distance = filtered_left_distance
+
+            elif right_in_range:
+                wrong_trigger = True
+
+        # RIGHT TILT = RIGHT SENSOR
+
+        elif tilt == "right":
+
+            if right_in_range:
+                correct_trigger = True
+                active_distance = filtered_right_distance
+
+            elif left_in_range:
+                wrong_trigger = True
+
+        # =====================================================
         # AUDIO
+        # =====================================================
 
         if (
-            valid_pose and
+            correct_trigger and
             current_time - last_play_time > MIN_PLAY_TIME
         ):
 
             volume = distance_to_volume(
-                filtered_distance
+                active_distance
             )
 
             kick_type = get_kick_from_acceleration(
@@ -725,31 +829,37 @@ while running:
 
             last_play_time = current_time
 
+            wrong_pose_start = None
+
         else:
             stop_sound()
 
+        # =====================================================
         # FALSE SOUND
+        # =====================================================
 
-        if cheating_pose:
+        if wrong_trigger:
 
-            if right_tilt_start is None:
-                right_tilt_start = current_time
+            if wrong_pose_start is None:
+                wrong_pose_start = current_time
 
             held_time = (
                 current_time -
-                right_tilt_start
+                wrong_pose_start
             )
 
             if held_time > FALSE_TRIGGER_TIME:
 
                 sounds["false"].play()
 
-                right_tilt_start = None
+                wrong_pose_start = None
 
         else:
-            right_tilt_start = None
+            wrong_pose_start = None
 
+        # =====================================================
         # UI TEXT
+        # =====================================================
 
         cv2.putText(
             display,
@@ -773,7 +883,7 @@ while running:
 
         cv2.putText(
             display,
-            f"Distance: {distance_cm:.1f} cm",
+            f"Left: {left_distance_cm:.1f} cm",
             (10, 110),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.5,
@@ -781,7 +891,29 @@ while running:
             2
         )
 
+        cv2.putText(
+            display,
+            f"Right: {right_distance_cm:.1f} cm",
+            (10, 135),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (0, 200, 255),
+            2
+        )
+
+        cv2.putText(
+            display,
+            f"Tilt: {tilt}",
+            (10, 160),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (255, 255, 255),
+            2
+        )
+
+        # =====================================================
         # SCREENSHOT
+        # =====================================================
 
         filename = None
 
@@ -857,7 +989,9 @@ while running:
 
                     last_capture_time = current_time
 
+        # =====================================================
         # CSV
+        # =====================================================
 
         if (
             current_time - last_csv_log_time >
@@ -882,8 +1016,14 @@ while running:
                 "sound_volume":
                     round(current_volume, 3),
 
-                "distance_cm":
-                    round(distance_cm, 2)
+                "left_distance_cm":
+                    round(left_distance_cm, 2),
+
+                "right_distance_cm":
+                    round(right_distance_cm, 2),
+
+                "tilt":
+                    tilt
             }
 
             row.update(imu_data)
@@ -892,7 +1032,9 @@ while running:
 
             last_csv_log_time = current_time
 
+        # =====================================================
         # WINDOWS
+        # =====================================================
 
         cv2.imshow(
             "Interactive Motion + Sound",
@@ -904,7 +1046,9 @@ while running:
             fgmask
         )
 
+        # =====================================================
         # ESC
+        # =====================================================
 
         if cv2.waitKey(1) & 0xFF == 27:
             clean_exit()
