@@ -17,8 +17,8 @@ left_sensor = DistanceSensor(
 )
 
 right_sensor = DistanceSensor(
-    echo=5,
-    trigger=6,
+    echo=27,
+    trigger=17,
     max_distance=2.0
 )
 
