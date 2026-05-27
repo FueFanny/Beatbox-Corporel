@@ -650,9 +650,15 @@ while running:
         # =====================================================
         # ULTRASONIC
         # =====================================================
-
         raw_left_distance = left_sensor.distance
+        time.sleep(0.03)
         raw_right_distance = right_sensor.distance
+        
+        if raw_left_distance is None or raw_left_distance < 0:
+            raw_left_distance = START_DISTANCE
+        
+        if raw_right_distance is None or raw_right_distance < 0:
+            raw_right_distance = START_DISTANCE
 
         filtered_left_distance = (
             SMOOTHING * filtered_left_distance +
