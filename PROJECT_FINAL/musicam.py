@@ -485,34 +485,46 @@ def pose_worker():
     global latest_frame
     global latest_keypoints
 
+    print("Pose thread started")
+
     while running:
 
-        if latest_frame is None:
-            time.sleep(0.005)
-            continue
+        try:
 
-        with lock:
-            frame = latest_frame.copy()
+            if latest_frame is None:
+                time.sleep(0.005)
+                continue
 
-        img = cv2.resize(frame, (192, 192))
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img = np.expand_dims(img, axis=0).astype(np.uint8)
+            with lock:
+                frame = latest_frame.copy()
 
-        interpreter.set_tensor(
-            input_details[0]['index'],
-            img
-        )
+            img = cv2.resize(frame, (192, 192))
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-        interpreter.invoke()
+            img = img.astype(np.uint8)
+            img = np.expand_dims(img, axis=0)
 
-        kp = interpreter.get_tensor(
-            output_details[0]['index']
-        )[0][0]
+            interpreter.set_tensor(
+                input_details[0]['index'],
+                img
+            )
 
-        kp = simplify_keypoints(kp)
+            interpreter.invoke()
 
-        with lock:
-            latest_keypoints = kp
+            kp = interpreter.get_tensor(
+                output_details[0]['index']
+            )[0][0]
+
+            kp = simplify_keypoints(kp)
+
+            with lock:
+                latest_keypoints = kp
+
+            print("Pose OK")
+
+        except Exception as e:
+            print("POSE THREAD ERROR:", e)
+            time.sleep(0.1)
 
 
 threading.Thread(
