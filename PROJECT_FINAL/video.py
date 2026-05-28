@@ -19,11 +19,8 @@ FPS = 30
 
 BACKGROUND_COLOR = (0, 0, 0)
 
-# fading speed
-# lower = longer trails
 FADE_MULTIPLIER = 0.94
 
-# image scaling
 SMALL_SCALE = 0.45
 MEDIUM_SCALE = 0.70
 LARGE_SCALE = 1.00
@@ -31,7 +28,6 @@ LARGE_SCALE = 1.00
 LOW_ACCEL = 1.3
 HIGH_ACCEL = 2.8
 
-# sound files
 SOUND_FILES = {
     "kick_soft": "sounds/soft/kick.wav",
     "kick_medium": "sounds/medium/kick.wav",
@@ -39,7 +35,9 @@ SOUND_FILES = {
     "false": "sounds/false/false.wav"
 }
 
+# =========================================================
 # LOAD CSV
+# =========================================================
 
 df = pd.read_csv(CSV_FILE)
 
@@ -50,7 +48,9 @@ df = df.sort_values(
     "time_since_start"
 ).reset_index(drop=True)
 
+# =========================================================
 # VIDEO WRITER
+# =========================================================
 
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 
@@ -61,15 +61,20 @@ writer = cv2.VideoWriter(
     (VIDEO_WIDTH, VIDEO_HEIGHT)
 )
 
+# =========================================================
 # HELPERS
+# =========================================================
 
 def safe(v, default=0):
+
     if pd.isna(v):
         return default
+
     return v
 
 
 def get_acceleration_magnitude(row):
+
     ax = safe(row.get("linear_x"))
     ay = safe(row.get("linear_y"))
     az = safe(row.get("linear_z"))
@@ -170,8 +175,9 @@ def overlay_image(background, image, x, y):
 
     background[y1:y2, x1:x2] = roi
 
-
+# =========================================================
 # BUILD EVENTS
+# =========================================================
 
 events = []
 
@@ -204,10 +210,8 @@ for _, row in df.iterrows():
         scale
     )
 
-    # IMU roll tilt
     roll = safe(row.get("roll"))
 
-    # stronger visible tilt
     rotation_angle = roll * 1.2
 
     image = rotate_image(
@@ -221,27 +225,32 @@ for _, row in df.iterrows():
 
     sound_name = row.get("sound_played")
 
-    distance = safe(
-        row.get("distance_cm")
+    left_distance = safe(
+        row.get("left_distance_cm")
     )
 
-    moving_parts = row.get(
-        "moving_parts"
+    right_distance = safe(
+        row.get("right_distance_cm")
     )
+
+    tilt = row.get("tilt")
 
     events.append({
         "time": timestamp,
         "image": image,
         "accel": accel_mag,
-        "distance": distance,
+        "left_distance": left_distance,
+        "right_distance": right_distance,
         "sound": sound_name,
-        "moving_parts": moving_parts
+        "tilt": tilt
     })
 
 if len(events) == 0:
     raise Exception("No valid image events.")
 
+# =========================================================
 # TIMELINE
+# =========================================================
 
 total_duration = events[-1]["time"] + 2.0
 
@@ -257,13 +266,14 @@ canvas = np.zeros(
     dtype=np.float32
 )
 
+# =========================================================
 # RENDER VIDEO
+# =========================================================
 
 for frame_idx in range(total_frames):
 
     current_time = frame_idx / FPS
 
-    # fade previous layers
     canvas *= FADE_MULTIPLIER
 
     while (
@@ -277,7 +287,6 @@ for frame_idx in range(total_frames):
 
         h, w = img.shape[:2]
 
-        # CENTERED STACKING
         x = (VIDEO_WIDTH - w) // 2
         y = (VIDEO_HEIGHT - h) // 2
 
@@ -287,9 +296,10 @@ for frame_idx in range(total_frames):
             "y": y,
             "alpha": 1.0,
             "sound": event["sound"],
-            "distance": event["distance"],
+            "left_distance": event["left_distance"],
+            "right_distance": event["right_distance"],
             "accel": event["accel"],
-            "moving_parts": event["moving_parts"]
+            "tilt": event["tilt"]
         })
 
         event_index += 1
@@ -313,7 +323,6 @@ for frame_idx in range(total_frames):
             layer["y"]
         )
 
-        # progressive fade
         layer["alpha"] *= 0.965
 
         if layer["alpha"] > 0.03:
@@ -329,7 +338,9 @@ for frame_idx in range(total_frames):
         255
     ).astype(np.uint8)
 
+    # =====================================================
     # UI TEXT
+    # =====================================================
 
     cv2.putText(
         output,
@@ -357,7 +368,7 @@ for frame_idx in range(total_frames):
 
         cv2.putText(
             output,
-            f"Distance: {latest['distance']:.1f} cm",
+            f"Left Distance: {latest['left_distance']:.1f} cm",
             (30, 125),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.7,
@@ -367,8 +378,18 @@ for frame_idx in range(total_frames):
 
         cv2.putText(
             output,
-            f"Accel: {latest['accel']:.2f}",
+            f"Right Distance: {latest['right_distance']:.1f} cm",
             (30, 160),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (0, 200, 255),
+            2
+        )
+
+        cv2.putText(
+            output,
+            f"Accel: {latest['accel']:.2f}",
+            (30, 195),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.7,
             (255, 255, 0),
@@ -377,10 +398,10 @@ for frame_idx in range(total_frames):
 
         cv2.putText(
             output,
-            f"Moving: {latest['moving_parts']}",
-            (30, 195),
+            f"Tilt: {latest['tilt']}",
+            (30, 230),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.6,
+            0.7,
             (150, 255, 150),
             2
         )
@@ -392,9 +413,15 @@ for frame_idx in range(total_frames):
         end="\r"
     )
 
+# =========================================================
 # SAVE VIDEO
+# =========================================================
 
 writer.release()
+
+# =========================================================
+# AUDIO TRACK
+# =========================================================
 
 print("\nGenerating audio track...")
 
@@ -406,9 +433,21 @@ final_audio = AudioSegment.silent(
     duration=total_duration_ms
 )
 
-for event in events:
+last_sound = None
 
-    sound_name = event["sound"]
+for _, row in df.iterrows():
+
+    sound_name = row.get("sound_played")
+
+    if pd.isna(sound_name):
+        last_sound = None
+        continue
+
+    # only trigger when sound changes
+    if sound_name == last_sound:
+        continue
+
+    last_sound = sound_name
 
     if sound_name not in SOUND_FILES:
         continue
@@ -422,8 +461,11 @@ for event in events:
         sound_path
     )
 
+    # optional shortening
+    sound = sound[:350]
+
     sound_time_ms = int(
-        event["time"] * 1000
+        safe(row.get("time_since_start")) * 1000
     )
 
     final_audio = final_audio.overlay(
@@ -431,16 +473,25 @@ for event in events:
         position=sound_time_ms
     )
 
+    print(
+        f"Added sound: {sound_name} "
+        f"at {sound_time_ms}ms"
+    )
+
+# =========================================================
 # EXPORT AUDIO
+# =========================================================
 
 final_audio.export(
     AUDIO_TRACK,
     format="wav"
 )
 
-print("Merging video + audio...")
-
+# =========================================================
 # FINAL VIDEO
+# =========================================================
+
+print("Merging video + audio...")
 
 subprocess.run([
     "ffmpeg",

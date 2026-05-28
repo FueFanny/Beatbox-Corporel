@@ -831,7 +831,7 @@ while running:
 
             cv2.imwrite(
                 filepath,
-                display
+                frame
             )
 
             print(f"Saved: {filename}")
