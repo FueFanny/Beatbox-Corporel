@@ -565,69 +565,20 @@ while running:
         # =====================================================
 
         if keypoints is not None:
-
             h, w = frame.shape[:2]
 
-            # skeleton
-
-            for p1, p2 in connections:
-
-                kp1 = keypoints[p1]
-                kp2 = keypoints[p2]
-
-                y1, x1, c1 = kp1
-                y2, x2, c2 = kp2
-
-                if (
-                    c1 > CONFIDENCE_THRESHOLD and
-                    c2 > CONFIDENCE_THRESHOLD
-                ):
-
-                    px1 = int(x1 * w)
-                    py1 = int(y1 * h)
-
-                    px2 = int(x2 * w)
-                    py2 = int(y2 * h)
-
-                    cv2.line(
-                        display,
-                        (px1, py1),
-                        (px2, py2),
-                        (0, 255, 0),
-                        2
-                    )
-
             # joints
-
             for i, kp in enumerate(keypoints):
 
                 y, x, conf = kp
-
                 if conf < CONFIDENCE_THRESHOLD:
                     continue
-
                 moving_parts.append(parts[i])
-
                 px = int(x * w)
                 py = int(y * h)
+                cv2.circle(display,(px, py),6,(255, 255, 255),-1)
 
-                cv2.circle(
-                    display,
-                    (px, py),
-                    6,
-                    (255, 255, 255),
-                    -1
-                )
-
-                cv2.putText(
-                    display,
-                    parts[i],
-                    (px + 5, py),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.4,
-                    (0, 255, 0),
-                    1
-                )
+                cv2.putText(display,parts[i],(px + 5, py),cv2.FONT_HERSHEY_SIMPLEX,0.4,(0, 255, 0),1)
 
         # =====================================================
         # IMU
