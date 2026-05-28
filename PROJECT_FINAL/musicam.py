@@ -500,8 +500,8 @@ def pose_worker():
 
             img = cv2.resize(frame, (192, 192))
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-            img = img.astype(np.uint8)
+            
+            img = img.astype(np.float32)
             img = np.expand_dims(img, axis=0)
 
             interpreter.set_tensor(
