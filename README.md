@@ -5,8 +5,10 @@ Ce projet github est pour contenir les tests / la documentation du processus fai
 
 Le README du projet lui-même est accessible dans le dossier PROJECT_FINAL/
 
-FLOAT32 for input 0, name: serving_default_input:0 
-POSE THREAD ERROR: Cannot set tensor: Got value of type UINT8 but expected type 
+Traceback (most recent call last):
+  File "/home/alice/PROJET_FINAL/video.py", line 6, in <module>
+    from pydub import AudioSegment
+ModuleNotFoundError: No module named 'pydub'
 
 pour activer le projet depuis le raspberry pi dans le terminal de base, 3 étapes : 
 
