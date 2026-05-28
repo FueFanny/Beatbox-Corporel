@@ -11,5 +11,7 @@ POSE THREAD ERROR: Cannot set tensor: Got value of type UINT8 but expected type
 pour activer le projet depuis le raspberry pi dans le terminal de base, 3 étapes : 
 
 $ cd /home/alice/PROJET_FINAL
+
 $ source tf-env39/bin/activate
+
 $ python gui.py
