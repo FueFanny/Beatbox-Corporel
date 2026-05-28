@@ -5,12 +5,7 @@ Ce projet github est pour contenir les tests / la documentation du processus fai
 
 Le README du projet lui-même est accessible dans le dossier PROJECT_FINAL/
 
-Traceback (most recent call last):
-  File "/home/alice/PROJET_FINAL/video.py", line 6, in <module>
-    from pydub import AudioSegment
-ModuleNotFoundError: No module named 'pydub'
-
-pour activer le projet depuis le raspberry pi dans le terminal de base, 3 étapes : 
+pour activer le projet final depuis le raspberry pi dans le terminal de base, 3 étapes : 
 
 $ cd /home/alice/PROJET_FINAL
 
