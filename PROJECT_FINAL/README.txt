@@ -10,14 +10,14 @@ L’objectif est d’encourager l’utilisateur à :
 * se pencher,
 * tendre les bras,
 * se rapprocher du sol,
-* interagir physiquement via de la musique.
+* interagir physiquement via de la musique pour une sorte de fonction de réhabilitation.
 
 Le projet combine :
 
 * un Raspberry Pi,
 * une webcam,
 * un capteur IMU BNO055,
-* un capteur ultrasonique,
+* deux capteurs ultrasonique,
 * de la détection de pose avec MoveNet,
 * de l’audio interactif,
 * une visualisation vidéo artistique des mouvements.
@@ -25,7 +25,7 @@ Le projet combine :
 Lorsqu’une personne se penche correctement et approche sa main du sol, des sons sont joués.
 Plus la main est proche du sol, plus le volume augmente, plus le mouvement devient musicalement intense.
 
-Les mouvements sont également enregistrés sous forme d’images, de données CSV, et d’une vidéo générée automatiquement.
+Les mouvements sont également enregistrés sous forme d’images, de données CSV, et d’une vidéo générée automatiquement quand le script de création de vidéo est lancé.
 
 --------------------
 
@@ -36,7 +36,7 @@ Composants:
 * Raspberry Pi 4
 * Webcam USB
 * Capteur IMU Adafruit BNO055
-* Capteur ultrasonique HC-SR04
+* 2 Capteurs ultrasonique HC-SR04
 * Haut-parleurs ou casque audio
 * Carte microSD pour le Raspberry Pi, au moins 16GB.
 * Connexion internet pour l’installation
@@ -44,7 +44,6 @@ Composants:
 ---
 
 BRANCHEMENT DES CAPTEURS
-
 BNO055(I2C)
 
 | BNO055 | Raspberry Pi |
@@ -63,7 +62,7 @@ Interface Options -> I2C -> Enable
 
 ---
 
-HC-SR04
+HC-SR04 1 gauche
 
 | HC-SR04 | Raspberry Pi |
 | ------- | ------------ |
@@ -71,6 +70,15 @@ HC-SR04
 | GND     | GND          |
 | TRIG    | GPIO23       |
 | ECHO    | GPIO24       |
+
+HC-SR04 2 droite
+
+| HC-SR04 | Raspberry Pi |
+| ------- | ------------ |
+| VCC     | 5V           |
+| GND     | GND          |
+| TRIG    | GPIO27       |
+| ECHO    | GPIO17       |
 
 IMPORTANT :
 Le pin ECHO du HC-SR04 sort du 5V.
@@ -111,9 +119,7 @@ Mise à jour du système
 $ sudo apt update
 $ sudo apt upgrade -y
 
-
 Installation des paquets système
-
 
 $ sudo apt install -y \
 python3-pip \
@@ -123,21 +129,20 @@ libatlas-base-dev \
 portaudio19-dev
 
 Installation des bibliothèques Python
-
-$ pip install numpy pandas gpiozero adafruit-circuitpython-bno055
+    
+    $ pip install numpy pandas gpiozero adafruit-circuitpython-bno055
 
 Installation de TensorFlow Lite
 
-$ pip install tflite-runtime
+    $ pip install tflite-runtime
 
 Si cela ne fonctionne pas :
 
-$ pip install https://github.com/google-coral/pycoral/releases/download/release-frogfish/tflite_runtime-2.5.0.post1-cp39-cp39-linux_armv7l.whl
+    $ pip install https://github.com/google-coral/pycoral/releases/download/release-frogfish/tflite_runtime-2.5.0.post1-cp39-cp39-linux_armv7l.whl
 
-Télécharger MoveNet
 Télécharger le modèle MoveNet Lightning :
 
-$ wget https://storage.googleapis.com/download.tensorflow.org/models/tflite/singlepose/lightning/4.tflite -O movenet_lightning.tflite
+    $ wget https://storage.googleapis.com/download.tensorflow.org/models/tflite/singlepose/lightning/4.tflite -O movenet_lightning.tflite
 
 -----------
 
@@ -172,6 +177,7 @@ L’interface permet :
 * d’arrêter le système,
 * de générer la vidéo,
 * d’ouvrir la vidéo.
+* de fermer le programme
 
 Lancer le système interactif seul :
 
@@ -188,7 +194,7 @@ Cela lance :
 
 generer la video d'analyse seule :
 
-$ python3 generate_video.py
+$ python3 video.py
 
 Cela génère motion_layers.mp4
 
@@ -207,7 +213,6 @@ Détection du corps :
 
 MoveNet détecte les points du corps en temps réel.
 Le système détecte ensuite les parties du corps en mouvement grâce à :
-
 * la soustraction de fond,
 * les keypoints MoveNet.
 Seules les parties réellement en mouvement sont capturées/crop.
@@ -222,9 +227,9 @@ Le capteur IMU permet de mesurer :
 
 Le système utilise notamment le roll pour détecter gauche/droite, et l’accélération linéaire pour mesurer l’intensité de l'instrument.
 
-UTILISATION DU CAPTEUR ULTRASONIQUE
-Le capteur mesure la distance entre la main et le sol.
-Plus la main se rapproche du sol, plus le son est fort, plus l’interaction devient intense.
+UTILISATION DES CAPTEURS ULTRASONIQUES
+Les capteurs mesurent la distance entre la main associée et le sol.
+Plus la main se rapproche du sol, plus le son est fort, plus le movement est rapide, plus l’interaction devient intense.
 
 ---
 
@@ -232,7 +237,7 @@ LOGIQUE SONORE
 Pour produire un son valide, l’utilisateur doit se pencher dans la bonne direction et rapprocher la main correspondante du sol.
 Sinon un faux son est joué.
 
-L’intensité du mouvement change également le type de kick :
+L’intensité du mouvement//l'accélération de l'IMU change également le type de kick :
 
 | Intensité | Son         |
 | --------- | ----------- |
@@ -262,16 +267,16 @@ time_since_start,image_file,moving_parts,sound_played,sound_volume,distance_cm
 Dépannage :
 
 Si Webcam non détectée
-$ls /dev/video*
+    $ ls /dev/video*
 
 Tester la caméra :
-$ libcamera-hello
+    $ libcamera-hello
 
 ---
 
 Si IMU non détecté
 
-$ i2cdetect -y 1
+    $ i2cdetect -y 1
 
 Le BNO055 apparaît normalement à l’adresse 28 ou 29. Si il n'est pas visible, il est mal cablé.
 
@@ -279,15 +284,14 @@ Le BNO055 apparaît normalement à l’adresse 28 ou 29. Si il n'est pas visible
 Si aucun son
 
 Tester les haut-parleurs :
-$ speaker-test -t wav
+    $ speaker-test -t wav
 
 Vérifier le volume :
-$ alsamixer
+    $ alsamixer
 
 ---
 Si problèmes GPIO
-
-$ sudo usermod -aG gpio $USER
+    $ sudo usermod -aG gpio $USER
 Puis redémarrer le Raspberry Pi.
 
 ---
