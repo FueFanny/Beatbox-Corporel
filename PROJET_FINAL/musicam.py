@@ -602,7 +602,7 @@ while running:
         # ULTRASONIC
         # =====================================================
         raw_left_distance = left_sensor.distance
-        time.sleep(0.03)
+        time.sleep(0.1)
         raw_right_distance = right_sensor.distance
         
         if raw_left_distance is None or raw_left_distance < 0:
