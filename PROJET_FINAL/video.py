@@ -457,9 +457,11 @@ for _, row in df.iterrows():
     if not os.path.exists(sound_path):
         continue
 
-    sound = AudioSegment.from_wav(
-        sound_path
-    )
+    try:
+        sound = AudioSegment.from_file(sound_path)
+    except Exception as e:
+        print(f"Couldn't load {sound_path}: {e}")
+        continue
 
     # optional shortening
     sound = sound[:350]
