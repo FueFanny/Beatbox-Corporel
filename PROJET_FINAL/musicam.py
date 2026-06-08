@@ -83,9 +83,9 @@ sounds = {
     "false": pygame.mixer.Sound("sounds/false/false.wav")
 }
 
-sounds["kick_soft"].set_volume(1.0)
-sounds["kick_medium"].set_volume(1.0)
-sounds["kick_hard"].set_volume(1.0)
+sounds["kick_soft"].set_volume(100.0)
+sounds["kick_medium"].set_volume(100.0)
+sounds["kick_hard"].set_volume(100.0)
 sounds["false"].set_volume(0.18)
 
 
@@ -276,7 +276,7 @@ def clamp(val, low, high):
 
 def distance_to_volume(distance):
 
-    normalized = 1.0 - (
+    normalized = 100.0 - (
         (distance - MIN_DISTANCE) /
         (START_DISTANCE - MIN_DISTANCE)
     )
@@ -311,7 +311,7 @@ def stop_sound():
 
     current_channel = None
     current_sound_name = None
-    current_volume = 0.0
+    current_volume = 10.0
 
 
 def play_loop(sound_name, volume):
@@ -831,7 +831,7 @@ while running:
 
             cv2.imwrite(
                 filepath,
-                frame
+                display
             )
 
             print(f"Saved: {filename}")
