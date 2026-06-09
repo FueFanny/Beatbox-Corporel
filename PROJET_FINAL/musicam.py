@@ -95,12 +95,8 @@ sounds["false"].set_volume(0.18)
 
 current_channel = None
 current_sound_name = None
-current_volume = 0.0
 
-last_kick_change = 0
 last_play_time = 0
-
-wrong_pose_start = None
 
 filtered_left_distance = 0.40
 filtered_right_distance = 0.40
@@ -108,6 +104,8 @@ filtered_right_distance = 0.40
 peak_accel = 0
 peak_accel_time = 0
 
+left_was_in_range = False
+right_was_in_range = False
 
 # =========================================================
 # PARAMETERS
@@ -274,20 +272,6 @@ def clamp(val, low, high):
     return max(low, min(high, val))
 
 
-def distance_to_volume(distance):
-
-    normalized = 100.0 - (
-        (distance - MIN_DISTANCE) /
-        (START_DISTANCE - MIN_DISTANCE)
-    )
-
-    normalized = clamp(normalized, 0.0, 1.0)
-
-    boosted = normalized ** 0.35
-
-    return clamp(boosted, 0.35, 1.0)
-
-
 def get_kick_from_acceleration(accel_mag):
 
     if accel_mag >= HARD_ACCEL:
@@ -299,65 +283,12 @@ def get_kick_from_acceleration(accel_mag):
     else:
         return "kick_soft"
 
-
-def stop_sound():
-
-    global current_channel
+def play_one_shot(sound_name):
     global current_sound_name
-    global current_volume
-
-    if current_channel:
-        current_channel.stop()
-
-    current_channel = None
-    current_sound_name = None
-    current_volume = 10.0
-
-
-def play_loop(sound_name, volume):
-
-    global current_channel
-    global current_sound_name
-    global current_volume
-    global last_kick_change
-
-    current_time = time.time()
-
     if sound_name not in sounds:
         return
-
-    should_change = (
-        current_sound_name != sound_name and
-        current_time - last_kick_change > KICK_CHANGE_COOLDOWN
-    )
-
-    if current_channel is None:
-
-        current_channel = sounds[sound_name].play(
-            loops=-1
-        )
-
-        current_sound_name = sound_name
-        last_kick_change = current_time
-
-    elif should_change:
-
-        stop_sound()
-
-        current_channel = sounds[sound_name].play(
-            loops=-1
-        )
-
-        current_sound_name = sound_name
-        last_kick_change = current_time
-
-    boosted_volume = min(volume * 2.2, 1.0)
-
-    if current_channel:
-        current_channel.set_volume(boosted_volume)
-
-    current_volume = boosted_volume
-
+    sounds[sound_name].play()
+    current_sound_name = sound_name
 
 # =========================================================
 # POSE SIMPLIFICATION
@@ -434,18 +365,11 @@ running = True
 # =========================================================
 
 def clean_exit(signum=None, frame=None):
-
     global running
-
     running = False
-
     print("\nStopping...")
-
     cap.release()
-
     cv2.destroyAllWindows()
-
-    stop_sound()
 
     pygame.quit()
 
@@ -500,7 +424,7 @@ def pose_worker():
 
             img = cv2.resize(frame, (192, 192))
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            
+
             img = img.astype(np.float32)
             img = np.expand_dims(img, axis=0)
 
@@ -602,14 +526,16 @@ while running:
         # ULTRASONIC
         # =====================================================
         raw_left_distance = left_sensor.distance
-        time.sleep(0.1)
         raw_right_distance = right_sensor.distance
-        
-        if raw_left_distance is None or raw_left_distance < 0:
-            raw_left_distance = START_DISTANCE
-        
-        if raw_right_distance is None or raw_right_distance < 0:
-            raw_right_distance = START_DISTANCE
+
+        def valid_distance(d):
+            return d is not None and 0.01 < d < 2.0
+
+        if not valid_distance(raw_left_distance):
+            raw_left_distance = filtered_left_distance
+
+        if not valid_distance(raw_right_distance):
+            raw_right_distance = filtered_right_distance
 
         filtered_left_distance = (
             SMOOTHING * filtered_left_distance +
@@ -674,81 +600,33 @@ while running:
         correct_trigger = False
         wrong_trigger = False
 
-        active_distance = None
-
-        # LEFT SIDE
-
         if tilt == "left":
-
-            if left_in_range:
-                correct_trigger = True
-                active_distance = filtered_left_distance
-
-            elif right_in_range:
-                wrong_trigger = True
-
-        # RIGHT SIDE
+            correct_trigger = left_in_range and not left_was_in_range
+            wrong_trigger = right_in_range and not right_was_in_range
 
         elif tilt == "right":
+            correct_trigger = right_in_range and not right_was_in_range
+            wrong_trigger = left_in_range and not left_was_in_range
 
-            if right_in_range:
-                correct_trigger = True
-                active_distance = filtered_right_distance
-
-            elif left_in_range:
-                wrong_trigger = True
+        left_was_in_range = left_in_range
+        right_was_in_range = right_in_range
 
         # =====================================================
         # AUDIO
         # =====================================================
 
-        if (
-            correct_trigger and
-            current_time - last_play_time > MIN_PLAY_TIME
-        ):
-
-            volume = distance_to_volume(
-                active_distance
-            )
-
-            kick_type = get_kick_from_acceleration(
-                effective_accel
-            )
-
-            play_loop(
-                kick_type,
-                volume
-            )
-
+        if correct_trigger and (current_time - last_play_time > MIN_PLAY_TIME):
+            kick_type = get_kick_from_acceleration(effective_accel)
+            play_one_shot(kick_type)
             last_play_time = current_time
-
-        else:
-
-            stop_sound()
 
         # =====================================================
         # FALSE SOUND
         # =====================================================
 
-        if wrong_trigger:
-
-            if wrong_pose_start is None:
-                wrong_pose_start = current_time
-
-            held_time = (
-                current_time -
-                wrong_pose_start
-            )
-
-            if held_time > FALSE_TRIGGER_TIME:
-
-                sounds["false"].play()
-
-                wrong_pose_start = None
-
-        else:
-
-            wrong_pose_start = None
+        if wrong_trigger and (current_time - last_false_time > FALSE_COOLDOWN):
+            sounds["false"].play()
+            last_false_time = current_time
 
         # =====================================================
         # UI
@@ -786,21 +664,10 @@ while running:
 
         cv2.putText(
             display,
-            f"Sound: {current_sound_name}",
-            (10, 120),
+            f"Sound: {current_sound_name if current_sound_name else 'none'}",
             cv2.FONT_HERSHEY_SIMPLEX,
             0.5,
             (0, 255, 0),
-            2
-        )
-
-        cv2.putText(
-            display,
-            f"Volume: {current_volume:.2f}",
-            (10, 150),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.5,
-            (255, 255, 0),
             2
         )
 
@@ -858,9 +725,6 @@ while running:
 
                 "sound_played":
                     current_sound_name,
-
-                "sound_volume":
-                    round(current_volume, 3),
 
                 "left_distance_cm":
                     round(left_distance_cm, 2),
