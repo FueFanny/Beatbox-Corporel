@@ -107,6 +107,8 @@ peak_accel_time = 0
 left_was_in_range = False
 right_was_in_range = False
 
+last_false_time = 0
+FALSE_COOLDOWN = 0.3
 # =========================================================
 # PARAMETERS
 # =========================================================
