@@ -665,6 +665,7 @@ while running:
         cv2.putText(
             display,
             f"Sound: {current_sound_name if current_sound_name else 'none'}",
+            (10, 120),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.5,
             (0, 255, 0),
