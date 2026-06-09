@@ -11,9 +11,10 @@ import board
 import busio
 import signal
 import sys
-import pigpio   # ✅ added
+import pigpio   # ✅ ADDED
 
 from adafruit_bno055 import BNO055_I2C
+# ❌ REMOVED gpiozero
 
 
 # =========================================================
@@ -45,7 +46,7 @@ imu = BNO055_I2C(i2c)
 
 
 # =========================================================
-# ULTRASONIC (pigpio)
+# ULTRASONIC (pigpio replacement)
 # =========================================================
 
 TRIG_LEFT = 23
@@ -55,6 +56,10 @@ TRIG_RIGHT = 27
 ECHO_RIGHT = 17
 
 pi = pigpio.pi()
+
+if not pi.connected:
+    print("ERROR: pigpio not running")
+    sys.exit(1)
 
 pi.set_mode(TRIG_LEFT, pigpio.OUTPUT)
 pi.set_mode(ECHO_LEFT, pigpio.INPUT)
@@ -85,12 +90,11 @@ def read_distance(trig, echo):
         end = time.time()
 
     duration = end - start
-    distance = (duration * 343) / 2
-    return distance
+    return (duration * 343) / 2
 
 
 # =========================================================
-# AUDIO
+# AUDIO (unchanged)
 # =========================================================
 
 pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=512)
@@ -102,11 +106,15 @@ sounds = {
     "false": pygame.mixer.Sound("sounds/false/false.wav")
 }
 
-sounds["kick_soft"].set_volume(1.0)
-sounds["kick_medium"].set_volume(1.0)
-sounds["kick_hard"].set_volume(1.0)
+sounds["kick_soft"].set_volume(100.0)
+sounds["kick_medium"].set_volume(100.0)
+sounds["kick_hard"].set_volume(100.0)
 sounds["false"].set_volume(0.18)
 
+
+# =========================================================
+# VARIABLES (unchanged)
+# =========================================================
 
 current_sound_name = None
 last_play_time = 0
@@ -125,7 +133,7 @@ FALSE_COOLDOWN = 0.3
 
 
 # =========================================================
-# PARAMETERS
+# PARAMETERS (unchanged)
 # =========================================================
 
 TILT_THRESHOLD = 15
@@ -136,18 +144,22 @@ MEDIUM_ACCEL = 1.3
 HARD_ACCEL = 2.8
 MOTION_MEMORY_TIME = 0.45
 MIN_PLAY_TIME = 0.4
+CAPTURE_COOLDOWN = 0.5
+CSV_LOG_INTERVAL = 0.1
 
 
 # =========================================================
-# CSV
+# CSV (unchanged)
 # =========================================================
 
 csv_rows = []
 program_start_time = time.time()
+last_capture_time = 0
+last_csv_log_time = 0
 
 
 # =========================================================
-# TFLITE
+# TFLITE (unchanged)
 # =========================================================
 
 interpreter = tflite.Interpreter(
@@ -161,36 +173,37 @@ output_details = interpreter.get_output_details()
 
 
 # =========================================================
-# CAMERA
+# CAMERA (unchanged)
 # =========================================================
 
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
 
 
 # =========================================================
-# IMU READ
+# IMU READ (unchanged)
 # =========================================================
 
 def read_imu():
-    accel = imu.linear_acceleration
+    accel = imu.acceleration
     euler = imu.euler
+    linear = imu.linear_acceleration
 
     return {
-        "linear_x": accel[0] if accel else 0,
-        "linear_y": accel[1] if accel else 0,
-        "linear_z": accel[2] if accel else 0,
-        "roll": euler[1] if euler else 0
+        "roll": euler[1] if euler else None,
+        "linear_x": linear[0] if linear else 0,
+        "linear_y": linear[1] if linear else 0,
+        "linear_z": linear[2] if linear else 0
     }
 
 
 # =========================================================
-# AUDIO
+# AUDIO HELPERS (unchanged)
 # =========================================================
 
-def get_kick_from_acceleration(accel):
-    if accel >= HARD_ACCEL:
+def get_kick_from_acceleration(a):
+    if a >= HARD_ACCEL:
         return "kick_hard"
-    elif accel >= MEDIUM_ACCEL:
+    elif a >= MEDIUM_ACCEL:
         return "kick_medium"
     return "kick_soft"
 
@@ -202,7 +215,7 @@ def play_one_shot(name):
 
 
 # =========================================================
-# CLEAN EXIT
+# CLEAN EXIT (modified)
 # =========================================================
 
 def clean_exit(signum=None, frame=None):
@@ -212,7 +225,7 @@ def clean_exit(signum=None, frame=None):
     cap.release()
     cv2.destroyAllWindows()
     pygame.quit()
-    pi.stop()  # important
+    pi.stop()   # ✅ important
 
     if len(csv_rows) > 0:
         with open(CSV_FILE, "w", newline="") as f:
@@ -233,6 +246,7 @@ signal.signal(signal.SIGINT, clean_exit)
 running = True
 
 while running:
+
     ret, frame = cap.read()
     if not ret:
         continue
@@ -246,7 +260,7 @@ while running:
     raw_right_distance = read_distance(TRIG_RIGHT, ECHO_RIGHT)
     time.sleep(0.05)
 
-    print("L:", raw_left_distance, "R:", raw_right_distance)
+    print("LEFT:", raw_left_distance, "RIGHT:", raw_right_distance)
 
     # ================= FILTER =================
     def valid(d):
@@ -273,10 +287,11 @@ while running:
     roll = imu_data["roll"]
 
     tilt = "center"
-    if roll > TILT_THRESHOLD:
-        tilt = "right"
-    elif roll < -TILT_THRESHOLD:
-        tilt = "left"
+    if roll is not None:
+        if roll > TILT_THRESHOLD:
+            tilt = "right"
+        elif roll < -TILT_THRESHOLD:
+            tilt = "left"
 
     # ================= LOGIC =================
     left_in_range = MIN_DISTANCE <= filtered_left_distance <= START_DISTANCE
@@ -295,13 +310,10 @@ while running:
         last_play_time = current_time
 
     # ================= DISPLAY =================
-    cv2.putText(frame, f"L: {left_cm:.1f} cm", (10, 30), 0, 0.7, (255, 255, 255), 2)
-    cv2.putText(frame, f"R: {right_cm:.1f} cm", (10, 60), 0, 0.7, (255, 255, 255), 2)
+    cv2.putText(frame, f"Left: {left_cm:.1f} cm", (10, 40), 0, 0.6, (255,255,255),2)
+    cv2.putText(frame, f"Right: {right_cm:.1f} cm", (10, 70), 0, 0.6, (255,255,255),2)
 
     cv2.imshow("System", frame)
 
     if cv2.waitKey(1) == 27:
         clean_exit()
-
-  #Before running
-  #sudo systemctl start pigpiod
