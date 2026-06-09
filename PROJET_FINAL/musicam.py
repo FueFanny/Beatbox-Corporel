@@ -465,7 +465,11 @@ threading.Thread(
 
 print("Programme lancé.")
 
+loop_counter = 0
+
 while running:
+    
+    loop_counter+= 1
 
     try:
 
@@ -527,8 +531,12 @@ while running:
         # =====================================================
         # ULTRASONIC
         # =====================================================
-        raw_left_distance = left_sensor.distance
-        raw_right_distance = right_sensor.distance
+        if loop_counter % 2 == 0:
+            raw_left_distance = left_sensor.distance
+        else:
+            raw_right_distance = right_sensor.distance
+        time.sleep(0.067)
+        print("LEfT:",raw_left_distance,"RIGHT:",raw_right_distance)
 
         def valid_distance(d):
             return d is not None and 0.01 < d < 2.0
