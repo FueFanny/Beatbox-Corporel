@@ -212,6 +212,12 @@ La vidéo contient :
 * les informations de distance,
 * les sons joués.
 
+generer le graph à partir du fichier csv, non accessible via l'interface utilisateur :
+
+$ python3 graph.py
+
+Le graph devrait s'afficher.
+
 ---
 
 FONCTIONNEMENT DU SYSTEME
