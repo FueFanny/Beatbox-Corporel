@@ -223,7 +223,7 @@ RAPPELS:
 Le capteur IMU permet de mesurer :
 * l’inclinaison du corps,
 * l’accélération,
-* l’orientation.
+* l’orientation de l'inclinaison.
 
 Le système utilise notamment le roll pour détecter gauche/droite, et l’accélération linéaire pour mesurer l’intensité de l'instrument.
 
@@ -252,15 +252,14 @@ Le système enregistre :
 
 * le timestamp,
 * le nom de du screenshot associé,
-* les parties du corps en mouvement,
-* les données IMU,
+* toutes les données IMU,
 * les sons joués,
 * le volume,
-* la distance au sol du capteur ultrason.
+* la distance au sol des capteurs ultrasons.
 
 Exemple csv:
-time_since_start,image_file,moving_parts,sound_played,sound_volume,distance_cm
-1.52,motion_1.52.jpg,left_wrist,kick_soft,0.72,18.4
+time_since_start,image_file,sound_played,sound_volume,distance_cm_droite,distance_cm_gauche
+1.52,motion_1.52.jpg,kick_soft,0.72,18.4,50.6
 
 -----------------------
 
@@ -268,26 +267,14 @@ Dépannage :
 
 Si Webcam non détectée
     $ ls /dev/video*
-
 Tester la caméra :
     $ libcamera-hello
 
 ---
 
 Si IMU non détecté
-
     $ i2cdetect -y 1
-
 Le BNO055 apparaît normalement à l’adresse 28 ou 29. Si il n'est pas visible, il est mal cablé.
-
----
-Si aucun son
-
-Tester les haut-parleurs :
-    $ speaker-test -t wav
-
-Vérifier le volume :
-    $ alsamixer
 
 ---
 Si problèmes GPIO
