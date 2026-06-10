@@ -1,5 +1,5 @@
 # Beatbox-Corporel
-Projet beatbox corporel stage 2026
+Projet beatbox corporel stage 2026 , Alice Chevalier
 
 Ce projet github est pour contenir les tests / la documentation du processus fait pour arriver au projet final. Le but du stage est l'apprentissage et preuve de concept.
 
