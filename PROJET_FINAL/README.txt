@@ -1,5 +1,13 @@
 # Système Interactif de Mouvement Musical pour Rééducation en Fauteuil Roulant
 
+pour activer le projet final depuis le raspberry pi dans son terminal, 3 étapes : 
+
+$ cd /home/alice/PROJET_FINAL
+
+$ source tf-env39/bin/activate
+
+$ python gui.py
+
 LE PROJET:
 
 Ce projet est un système interactif basé sur le mouvement, conçu pour encourager l’activité physique chez les personnes en fauteuil roulant.
@@ -21,6 +29,7 @@ Le projet combine :
 * de la détection de pose avec MoveNet,
 * de l’audio interactif,
 * une visualisation vidéo artistique des mouvements.
+* nouvellement, une création de graphe illustrant l'accélération de l'IMU et son orientation sur le temps.
 
 Lorsqu’une personne se penche correctement et approche sa main du sol, des sons sont joués.
 Plus la main est proche du sol, plus le volume augmente, plus le mouvement devient musicalement intense.
@@ -91,6 +100,7 @@ PROJECT BeatBoxCorp/
 │
 ├── musicam.py
 ├── video.py
+├── graph.py
 ├── gui.py
 ├── motion_log.csv
 ├── captures/
@@ -150,12 +160,6 @@ SONS
 
 Le projet utilise des fichiers WAV.
 
-Tu peux utiliser :
-* des samples de kick,
-* des batteries électroniques,
-* des percussions,
-* des sons de drum machine.
-
 Les sons doivent être placés dans le fichier sounds à leurs place respectives.
 
 Exemple, sons de base :
@@ -164,6 +168,8 @@ sounds/soft/kick.wav
 sounds/medium/kick.wav
 sounds/hard/kick.wav
 sounds/false/false.wav
+
+Il peuvent être changés manuellement, mais si leurs noms sont différents de "kick.wav", ouvrir musicam.py et allez à la ligne 80 pour changer le nom des fichiés récupérés, voir en ajouter selon les besoins. 
 
 ---
 
