@@ -409,5 +409,3 @@ sudo reboot
 ## Licence
 
 Projet éducatif et de recherche.
-
-```
