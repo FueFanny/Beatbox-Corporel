@@ -89,7 +89,7 @@ Activer I2C :
 sudo raspi-config
 ```
 
-Interface Options → I2C → Enable
+Interface Options -> I2C -> Enable
 
 ---
 
@@ -214,7 +214,7 @@ sounds/hard/kick.wav
 sounds/false/false.wav
 ```
 
-Si les noms changent, modifier `musicam.py` (ligne ~80).
+Si les noms changent, modifier `musicam.py` à environ la ligne 80.
 
 ---
 
@@ -348,7 +348,7 @@ Impact :
 | Moyenne   | Kick medium |
 | Forte     | Kick hard   |
 
-Si mouvement invalide → son "false"
+Si mouvement invalide -> son "false". Ici, un mouvement invalide n'est que lorsque la direction de l'inclinaison est inverse au capteur actif.
 
 ---
 
