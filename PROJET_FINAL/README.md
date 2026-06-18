@@ -1,6 +1,6 @@
-# 🎵 Système Interactif de Mouvement Musical pour Rééducation en Fauteuil Roulant
+# Système Interactif de Mouvement Musical pour Rééducation en Fauteuil Roulant
 
-## 🚀 Lancement du projet sur Raspberry Pi
+## Lancement du projet sur Raspberry Pi
 
 Pour activer le projet final depuis le Raspberry Pi dans son terminal, 3 étapes :
 
